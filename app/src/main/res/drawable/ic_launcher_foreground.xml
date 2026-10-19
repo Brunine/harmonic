@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Waveform mark centred in the 66dp safe zone -->
+    <path
+        android:fillColor="#FFFF6B4A"
+        android:pathData="M33,48h5v12h-5zM42,38h5v32h-5zM51,30h6v48h-6zM61,40h5v28h-5zM70,48h5v12h-5z" />
+</vector>
