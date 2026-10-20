@@ -76,7 +76,7 @@ class HomeViewModel(private val c: AppContainer) : ViewModel() {
         viewModelScope.launch {
             val seed = c.db.songDao().recentOnce(1).firstOrNull() ?: return@launch
             loadingPicks.value = true
-            quickPicks.value = runCatching { c.youtube.related(seed.id).take(12) }.getOrDefault(emptyList())
+            quickPicks.value = runCatching { c.catalog.related(seed.toTrack()).take(12) }.getOrDefault(emptyList())
             loadingPicks.value = false
         }
     }

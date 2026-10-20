@@ -78,6 +78,14 @@ data class FormatEntity(
     val bitrate: Int,
 )
 
+/** Which YouTube video plays a Deezer / Apple Music track. */
+@Entity(tableName = "matches")
+data class MatchEntity(
+    @PrimaryKey val sourceId: String,
+    val youtubeId: String,
+    val matchedAt: Long,
+)
+
 data class PlaylistSummary(
     @Embedded val playlist: PlaylistEntity,
     val songCount: Int,

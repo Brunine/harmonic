@@ -22,6 +22,21 @@ enum class AudioQuality(val label: String, val description: String) {
     HIGH("High", "Best available, ~160 kbps Opus"),
 }
 
+enum class ThemeMode(val label: String) { SYSTEM("Follow system"), LIGHT("Light"), DARK("Dark") }
+
+/** Colour palettes. [seed] is the key colour the whole scheme is derived from. */
+enum class ThemePalette(val label: String, val seed: Long?) {
+    WALLPAPER("Wallpaper colours", null),
+    ALBUM("Current song's cover", null),
+    EMBER("Ember", 0xFFFF6B4A),
+    OCEAN("Ocean", 0xFF2F80ED),
+    FOREST("Forest", 0xFF2E9E5B),
+    VIOLET("Violet", 0xFF8E5CF7),
+    ROSE("Rose", 0xFFE8508C),
+    SUNSET("Sunset", 0xFFF2A33A),
+    MONO("Monochrome", 0xFF808080),
+}
+
 data class AppSettings(
     val qualityWifi: AudioQuality = AudioQuality.HIGH,
     val qualityMobile: AudioQuality = AudioQuality.LOW,
@@ -32,6 +47,12 @@ data class AppSettings(
     val autoplayRelated: Boolean = true,
     val audioOffload: Boolean = true,
     val dataSaverImages: Boolean = true,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val palette: ThemePalette = ThemePalette.EMBER,
+    /** True black backgrounds in dark mode: saves battery on OLED screens. */
+    val pureBlack: Boolean = false,
+    /** Name shown to friends in a Jam; empty means the phone model. */
+    val jamName: String = "",
 )
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
@@ -49,6 +70,10 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         val autoplayRelated = booleanPreferencesKey("autoplay_related")
         val audioOffload = booleanPreferencesKey("audio_offload")
         val dataSaverImages = booleanPreferencesKey("data_saver_images")
+        val themeMode = stringPreferencesKey("theme_mode")
+        val palette = stringPreferencesKey("palette")
+        val pureBlack = booleanPreferencesKey("pure_black")
+        val jamName = stringPreferencesKey("jam_name")
     }
 
     private fun Preferences.toSettings(): AppSettings {
@@ -65,6 +90,10 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
             autoplayRelated = this[Keys.autoplayRelated] ?: d.autoplayRelated,
             audioOffload = this[Keys.audioOffload] ?: d.audioOffload,
             dataSaverImages = this[Keys.dataSaverImages] ?: d.dataSaverImages,
+            themeMode = this[Keys.themeMode]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: d.themeMode,
+            palette = this[Keys.palette]?.let { runCatching { ThemePalette.valueOf(it) }.getOrNull() } ?: d.palette,
+            pureBlack = this[Keys.pureBlack] ?: d.pureBlack,
+            jamName = this[Keys.jamName] ?: d.jamName,
         )
     }
 
@@ -91,4 +120,8 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
     suspend fun setAutoplayRelated(v: Boolean) = store.edit { it[Keys.autoplayRelated] = v }
     suspend fun setAudioOffload(v: Boolean) = store.edit { it[Keys.audioOffload] = v }
     suspend fun setDataSaverImages(v: Boolean) = store.edit { it[Keys.dataSaverImages] = v }
+    suspend fun setThemeMode(v: ThemeMode) = store.edit { it[Keys.themeMode] = v.name }
+    suspend fun setPalette(v: ThemePalette) = store.edit { it[Keys.palette] = v.name }
+    suspend fun setPureBlack(v: Boolean) = store.edit { it[Keys.pureBlack] = v }
+    suspend fun setJamName(v: String) = store.edit { it[Keys.jamName] = v.trim().take(30) }
 }

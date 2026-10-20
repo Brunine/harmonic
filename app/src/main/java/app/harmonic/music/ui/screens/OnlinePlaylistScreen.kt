@@ -57,7 +57,6 @@ import app.harmonic.music.ui.importPlaylist
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import org.schabi.newpipe.extractor.Page
 
 class OnlinePlaylistViewModel(private val c: AppContainer, private val url: String) : ViewModel() {
     val playlist = MutableStateFlow<OnlinePlaylist?>(null)
@@ -66,7 +65,7 @@ class OnlinePlaylistViewModel(private val c: AppContainer, private val url: Stri
 
     init {
         viewModelScope.launch {
-            runCatching { c.youtube.playlist(url) }
+            runCatching { c.catalog.collection(url) }
                 .onSuccess { playlist.value = it }
                 .onFailure { error.value = it.message ?: "Couldn't load playlist" }
         }
@@ -74,11 +73,12 @@ class OnlinePlaylistViewModel(private val c: AppContainer, private val url: Stri
 
     fun loadMore() {
         val p = playlist.value ?: return
-        if (loadingMore.value || !Page.isValid(p.nextPage)) return
+        val token = p.next ?: return
+        if (loadingMore.value) return
         viewModelScope.launch {
             loadingMore.value = true
-            runCatching { c.youtube.playlistMore(url, p.nextPage!!) }.onSuccess { (tracks, next) ->
-                playlist.value = p.copy(tracks = (p.tracks + tracks).distinctBy { it.id }, nextPage = next)
+            runCatching { c.catalog.collectionMore(url, token) }.onSuccess { (tracks, next) ->
+                playlist.value = p.copy(tracks = (p.tracks + tracks).distinctBy { it.id }, next = next)
             }
             loadingMore.value = false
         }
@@ -87,8 +87,8 @@ class OnlinePlaylistViewModel(private val c: AppContainer, private val url: Stri
     /** Loads every page first so "play", "save" and "download" act on the whole list. */
     private suspend fun allTracks(): List<Track> {
         val p = playlist.value ?: return emptyList()
-        if (!Page.isValid(p.nextPage)) return p.tracks
-        val full = c.youtube.playlistAll(url)
+        if (p.next == null) return p.tracks
+        val full = c.catalog.collectionAll(url)
         playlist.value = full
         return full.tracks
     }
@@ -97,10 +97,13 @@ class OnlinePlaylistViewModel(private val c: AppContainer, private val url: Stri
         runCatching { allTracks() }.onSuccess { c.playerConnection.play(it, shuffle = shuffle) }
     }
 
-    fun downloadAll(onDone: (Int) -> Unit) = viewModelScope.launch {
+    fun downloadAll(onDone: (String) -> Unit) = viewModelScope.launch {
         runCatching { allTracks() }.onSuccess {
-            c.downloads.download(it)
-            onDone(it.size)
+            val skipped = c.downloads.download(it)
+            onDone(
+                if (skipped == it.size) "SoundCloud tracks can't be downloaded"
+                else "Downloading ${it.size - skipped} songs",
+            )
         }
     }
 
@@ -175,7 +178,7 @@ fun OnlinePlaylistScreen(url: String, onBack: () -> Unit) {
                                 Icon(Icons.Filled.LibraryAdd, "Save to library")
                             }
                             FilledTonalButton(onClick = {
-                                vm.downloadAll { n -> actions.showMessage("Downloading $n songs") }
+                                vm.downloadAll(actions.showMessage)
                             }) {
                                 Icon(Icons.Filled.Download, "Download all")
                             }

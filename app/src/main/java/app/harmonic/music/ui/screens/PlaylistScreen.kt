@@ -139,8 +139,11 @@ fun PlaylistScreen(id: Long, onBack: () -> Unit) {
                         }
                         FilledTonalButton(
                             onClick = {
-                                c.downloads.download(tracks)
-                                actions.showMessage("Downloading ${tracks.size - downloadedCount} songs")
+                                val skipped = c.downloads.download(tracks)
+                                actions.showMessage(
+                                    "Downloading ${tracks.size - downloadedCount - skipped} songs" +
+                                        if (skipped > 0) " ($skipped SoundCloud tracks can't be downloaded)" else "",
+                                )
                             },
                             enabled = downloadedCount < tracks.size,
                         ) {

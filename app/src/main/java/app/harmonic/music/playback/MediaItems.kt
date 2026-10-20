@@ -5,7 +5,11 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.MimeTypes
+import app.harmonic.music.data.model.MusicSource
 import app.harmonic.music.data.model.Track
+import app.harmonic.music.data.model.soundCloudUrl
+import app.harmonic.music.data.model.source
 
 private const val EXTRA_THUMB = "harmonic.thumb"
 private const val EXTRA_VIDEO = "harmonic.video"
@@ -13,20 +17,33 @@ private const val EXTRA_VIDEO = "harmonic.video"
 /** Browse ids for Android Auto children are "<parentId>|<videoId>"; queue items are the bare id. */
 fun MediaItem.trackId(): String = mediaId.substringAfterLast('|')
 
-fun watchUri(videoId: String): Uri = Uri.parse("https://music.youtube.com/watch?v=$videoId")
+fun watchUri(videoId: String): Uri = Uri.parse("https://music.youtube.com/watch?v=" + Uri.encode(videoId))
+
+/** Reverse of the placeholder URIs below, for data specs that carry no cache key. */
+fun trackIdFromPlaceholder(uri: Uri): String? = when (uri.host) {
+    "music.youtube.com" -> uri.getQueryParameter("v")
+    "soundcloud.com" -> uri.path?.trim('/')?.takeIf { it.isNotEmpty() }?.let { "sc:$it" }
+    else -> null
+}
 
 /**
  * Builds a playable item. The URI is a placeholder: the real stream URL is resolved lazily by
- * the data source on a cache miss, and the custom cache key (the video id) ties the download
+ * the data source on a cache miss, and the custom cache key (the track id) ties the download
  * cache, the player cache and the resolver together.
+ *
+ * SoundCloud items are HLS playlists, which are streamed without the byte cache.
  */
-fun Track.toMediaItem(context: Context, mediaId: String = id): MediaItem =
-    MediaItem.Builder()
+fun Track.toMediaItem(context: Context, mediaId: String = id): MediaItem {
+    val builder = MediaItem.Builder()
         .setMediaId(mediaId)
-        .setUri(watchUri(id))
-        .setCustomCacheKey(id)
         .setMediaMetadata(toMetadata(context))
-        .build()
+    if (source == MusicSource.SOUNDCLOUD) {
+        builder.setUri(Uri.parse(soundCloudUrl(id))).setMimeType(MimeTypes.APPLICATION_M3U8)
+    } else {
+        builder.setUri(watchUri(id)).setCustomCacheKey(id)
+    }
+    return builder.build()
+}
 
 fun Track.toMetadata(context: Context): MediaMetadata =
     MediaMetadata.Builder()

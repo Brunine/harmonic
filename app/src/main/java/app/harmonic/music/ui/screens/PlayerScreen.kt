@@ -214,8 +214,11 @@ fun PlayerScreen(onClose: () -> Unit) {
                     download?.isDone == true -> actions.showMessage("Available offline")
                     download?.isActive == true -> actions.showMessage("Downloading… ${download.percent.toInt()}%")
                     else -> {
-                        c.downloads.download(listOf(current))
-                        actions.showMessage("Downloading “${current.title}”")
+                        if (c.downloads.download(listOf(current)) > 0) {
+                            actions.showMessage("SoundCloud tracks can't be downloaded")
+                        } else {
+                            actions.showMessage("Downloading “${current.title}”")
+                        }
                     }
                 }
             }) {

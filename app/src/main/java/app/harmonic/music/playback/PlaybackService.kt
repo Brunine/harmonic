@@ -32,7 +32,9 @@ import app.harmonic.music.AppContainer
 import app.harmonic.music.R
 import app.harmonic.music.container
 import app.harmonic.music.data.db.toEntity
+import app.harmonic.music.data.model.MusicSource
 import app.harmonic.music.data.model.Track
+import app.harmonic.music.data.model.source
 import app.harmonic.music.ui.MainActivity
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
@@ -180,7 +182,7 @@ class PlaybackService : MediaLibraryService() {
             recordPlay(mediaItem)
             scheduleSponsorBlock(mediaItem)
             prefetchNext()
-            maybeExtendQueue(id)
+            maybeExtendQueue(mediaItem.toTrack())
             saveQueueSoon()
         }
 
@@ -218,13 +220,14 @@ class PlaybackService : MediaLibraryService() {
     }
 
     /** Radio: when the queue is about to run out, append what YouTube recommends next. */
-    private fun maybeExtendQueue(id: String) {
+    private fun maybeExtendQueue(track: Track) {
+        val id = track.id
         if (!app.settings.current.autoplayRelated) return
         if (player.repeatMode != Player.REPEAT_MODE_OFF) return
         if (player.mediaItemCount - player.currentMediaItemIndex > 3) return
         if (!app.hasNetwork() || !radioRequested.add(id)) return
         scope.launch {
-            val related = runCatching { app.youtube.related(id) }.getOrNull() ?: return@launch
+            val related = runCatching { app.catalog.related(track) }.getOrNull() ?: return@launch
             val existing = HashSet<String>()
             for (i in 0 until player.mediaItemCount) existing += player.getMediaItemAt(i).trackId()
             val toAdd = related.filter { it.id !in existing }.take(20)
@@ -243,7 +246,8 @@ class PlaybackService : MediaLibraryService() {
         sponsorMessages.forEach { it.cancel() }
         sponsorMessages.clear()
         val track = item.toTrack()
-        if (!app.settings.current.sponsorBlock || !track.isVideo || !app.hasNetwork()) return
+        if (!app.settings.current.sponsorBlock || !track.isVideo || track.source != MusicSource.YOUTUBE) return
+        if (!app.hasNetwork()) return
         val id = track.id
         val index = player.currentMediaItemIndex
         sponsorJob = scope.launch {
@@ -347,14 +351,21 @@ class PlaybackService : MediaLibraryService() {
     // Session / browse callbacks (app UI, Android Auto, Assistant, Bluetooth)
     // ---------------------------------------------------------------------------------------
 
-    private suspend fun resolveItems(items: List<MediaItem>): List<MediaItem> = items.map { item ->
-        val track: Track = when {
-            item.hasMetadata() -> item.toTrack()
-            else -> withContext(Dispatchers.IO) { app.db.songDao().get(item.trackId())?.toTrack() }
-                ?: runCatching { app.youtube.track(item.trackId()) }.getOrNull()
-                ?: Track(item.trackId(), item.trackId(), "")
+    /**
+     * Fills in metadata for bare ids and stores every track before it plays: Deezer and Apple
+     * Music tracks are matched to YouTube by title/artist read from the database.
+     */
+    private suspend fun resolveItems(items: List<MediaItem>): List<MediaItem> {
+        val tracks = items.map { item ->
+            when {
+                item.hasMetadata() -> item.toTrack()
+                else -> withContext(Dispatchers.IO) { app.db.songDao().get(item.trackId())?.toTrack() }
+                    ?: runCatching { app.youtube.track(item.trackId()) }.getOrNull()
+                    ?: Track(item.trackId(), item.trackId(), "")
+            }
         }
-        track.toMediaItem(this)
+        withContext(Dispatchers.IO) { app.db.songDao().insertIgnoreAll(tracks.map { it.toEntity() }) }
+        return tracks.map { it.toMediaItem(this) }
     }
 
     private fun <T> paged(all: List<T>, page: Int, pageSize: Int): List<T> {

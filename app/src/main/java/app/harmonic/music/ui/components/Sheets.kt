@@ -46,6 +46,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.harmonic.music.data.model.Track
+import app.harmonic.music.data.model.canDownload
+import app.harmonic.music.data.model.shareUrl
 import app.harmonic.music.ui.ExtraAction
 import app.harmonic.music.ui.LocalContainer
 import app.harmonic.music.ui.LocalDownloadStates
@@ -64,6 +66,7 @@ fun TrackMenuSheet(track: Track, extras: List<ExtraAction>, onDismiss: () -> Uni
     val context = LocalContext.current
     val song by remember(track.id) { container.db.songDao().observe(track.id) }.collectAsState(null)
     val download = LocalDownloadStates.current[track.id]
+    val inJam = container.jam.isGuest
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.navigationBarsPadding()) {
@@ -82,13 +85,19 @@ fun TrackMenuSheet(track: Track, extras: List<ExtraAction>, onDismiss: () -> Uni
                 onDismiss()
             }
 
-            MenuItem("Play next", Icons.Filled.SkipNext) { act { connection.playNext(listOf(track)) } }
-            MenuItem("Add to queue", Icons.AutoMirrored.Filled.QueueMusic) { act { connection.addToQueue(listOf(track)) } }
-            MenuItem("Start radio", Icons.Filled.Radio) {
-                act {
-                    container.appScope.launch(Dispatchers.Main) {
-                        val related = runCatching { container.youtube.related(track.id) }.getOrDefault(emptyList())
-                        connection.play(listOf(track) + related.filter { it.id != track.id })
+            MenuItem(if (inJam) "Play next in the Jam" else "Play next", Icons.Filled.SkipNext) {
+                act { connection.playNext(listOf(track)) }
+            }
+            MenuItem(if (inJam) "Add to the Jam" else "Add to queue", Icons.AutoMirrored.Filled.QueueMusic) {
+                act { connection.addToQueue(listOf(track)) }
+            }
+            if (!inJam) {
+                MenuItem("Start radio", Icons.Filled.Radio) {
+                    act {
+                        container.appScope.launch(Dispatchers.Main) {
+                            val related = runCatching { container.catalog.related(track) }.getOrDefault(emptyList())
+                            connection.play(listOf(track) + related.filter { it.id != track.id })
+                        }
                     }
                 }
             }
@@ -105,19 +114,20 @@ fun TrackMenuSheet(track: Track, extras: List<ExtraAction>, onDismiss: () -> Uni
                     MenuItem("Cancel download (${download.percent.toInt()}%)", Icons.Filled.Delete) {
                         act { container.downloads.remove(track.id) }
                     }
-                else ->
+                track.canDownload ->
                     MenuItem("Download", Icons.Filled.Download) {
                         act {
                             container.downloads.download(listOf(track))
                             actions.showMessage("Downloading “${track.title}”")
                         }
                     }
+                else -> Unit
             }
             MenuItem("Share", Icons.Filled.Share) {
                 act {
                     val send = Intent(Intent.ACTION_SEND)
                         .setType("text/plain")
-                        .putExtra(Intent.EXTRA_TEXT, "https://music.youtube.com/watch?v=${track.id}")
+                        .putExtra(Intent.EXTRA_TEXT, track.shareUrl())
                     context.startActivity(Intent.createChooser(send, null))
                 }
             }

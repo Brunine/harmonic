@@ -38,6 +38,17 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import app.harmonic.music.BuildConfig
 import app.harmonic.music.data.prefs.AudioQuality
+import app.harmonic.music.data.prefs.ThemeMode
+import app.harmonic.music.data.prefs.ThemePalette
+import app.harmonic.music.ui.theme.paletteSwatch
+import android.os.Build
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import app.harmonic.music.ui.LocalContainer
 import app.harmonic.music.ui.LocalUiActions
 import app.harmonic.music.ui.Routes
@@ -56,6 +67,8 @@ fun SettingsScreen(onBack: () -> Unit) {
     val signedIn = cookies != null && c.account.isLoggedIn
     var qualityDialog by remember { mutableStateOf<QualityTarget?>(null) }
     var cacheDialog by remember { mutableStateOf(false) }
+    var themeDialog by remember { mutableStateOf(false) }
+    var paletteDialog by remember { mutableStateOf(false) }
     var cacheUsed by remember { mutableLongStateOf(-1L) }
     var downloadsUsed by remember { mutableLongStateOf(-1L) }
 
@@ -79,6 +92,15 @@ fun SettingsScreen(onBack: () -> Unit) {
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
+            Header("Appearance")
+            ClickRow("Theme", s.themeMode.label) { themeDialog = true }
+            ClickRow("Colours", s.palette.label) { paletteDialog = true }
+            SwitchRow(
+                "Pure black",
+                "Black backgrounds in dark theme. Saves battery on OLED screens",
+                s.pureBlack,
+            ) { runAsync { c.settings.setPureBlack(it) } }
+
             Header("Audio quality")
             ClickRow("On Wi-Fi", s.qualityWifi.label) { qualityDialog = QualityTarget.WIFI }
             ClickRow("On mobile data", s.qualityMobile.label) { qualityDialog = QualityTarget.MOBILE }
@@ -175,6 +197,28 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
     }
 
+    if (themeDialog) {
+        ChoiceDialog(
+            title = "Theme",
+            options = ThemeMode.entries.map { it to it.label },
+            selected = s.themeMode,
+            onDismiss = { themeDialog = false },
+        ) { mode ->
+            themeDialog = false
+            runAsync { c.settings.setThemeMode(mode) }
+        }
+    }
+
+    if (paletteDialog) {
+        PaletteDialog(
+            selected = s.palette,
+            onDismiss = { paletteDialog = false },
+        ) { palette ->
+            paletteDialog = false
+            runAsync { c.settings.setPalette(palette) }
+        }
+    }
+
     if (cacheDialog) {
         ChoiceDialog(
             title = "Streaming cache size",
@@ -187,6 +231,54 @@ fun SettingsScreen(onBack: () -> Unit) {
             actions.showMessage("Applies the next time the app starts")
         }
     }
+}
+
+@Composable
+private fun PaletteDialog(selected: ThemePalette, onDismiss: () -> Unit, onSelect: (ThemePalette) -> Unit) {
+    val options = ThemePalette.entries.filter {
+        it != ThemePalette.WALLPAPER || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Colours") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                options.forEach { palette ->
+                    ListItem(
+                        headlineContent = { Text(palette.label) },
+                        supportingContent = when (palette) {
+                            ThemePalette.WALLPAPER -> ({ Text("Matches your phone's wallpaper") })
+                            ThemePalette.ALBUM -> ({ Text("Changes with each song") })
+                            else -> null
+                        },
+                        leadingContent = {
+                            val swatch = paletteSwatch(palette)
+                            Box(
+                                Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (swatch != null) {
+                                            Brush.linearGradient(listOf(swatch, swatch))
+                                        } else {
+                                            Brush.sweepGradient(
+                                                listOf(Color(0xFFFF6B4A), Color(0xFFF2A33A), Color(0xFF2E9E5B), Color(0xFF2F80ED), Color(0xFF8E5CF7), Color(0xFFFF6B4A)),
+                                            )
+                                        },
+                                    ),
+                            )
+                        },
+                        trailingContent = { RadioButton(selected = palette == selected, onClick = null) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(selected = palette == selected, onClick = { onSelect(palette) }),
+                    )
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 private enum class QualityTarget(val title: String) {

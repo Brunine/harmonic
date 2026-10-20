@@ -3,6 +3,7 @@ package app.harmonic.music.ui
 import app.harmonic.music.AppContainer
 import app.harmonic.music.data.db.PlaylistEntity
 import app.harmonic.music.data.model.Track
+import app.harmonic.music.data.remote.CatalogRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -30,14 +31,17 @@ suspend fun AppContainer.addToPlaylist(playlistId: Long, tracks: List<Track>) = 
     db.playlistDao().append(playlistId, tracks.map { it.id })
 }
 
-/** Copies a YouTube / YouTube Music playlist or album into the local library. */
+/** Copies a playlist or album from any supported service into the local library. */
 suspend fun AppContainer.importPlaylist(url: String): Pair<Long, Int> {
-    val online = youtube.playlistAll(url)
-    val id = createPlaylist(online.title, online.tracks, url)
+    val collectionUrl = when (val target = catalog.resolveLink(url)) {
+        is CatalogRepository.LinkTarget.Collection -> target.url
+        is CatalogRepository.LinkTarget.Song -> throw IllegalArgumentException("That's a link to a single song")
+        null -> throw IllegalArgumentException("Unsupported link")
+    }
+    val online = catalog.collectionAll(collectionUrl)
+    val id = createPlaylist(online.title, online.tracks, collectionUrl)
     return id to online.tracks.size
 }
-
-fun isPlaylistUrl(text: String) = text.contains("list=") && !text.contains("list=RD")
 
 fun extractUrl(text: String): String? =
     Regex("https?://\\S+").find(text)?.value

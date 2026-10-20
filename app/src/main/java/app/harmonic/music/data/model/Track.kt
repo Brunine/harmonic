@@ -2,7 +2,15 @@ package app.harmonic.music.data.model
 
 import androidx.compose.runtime.Immutable
 
-/** A playable YouTube / YouTube Music item. [id] is the YouTube video id. */
+/**
+ * A playable item.
+ *
+ * [id] identifies both the track and its source:
+ *  - YouTube / YouTube Music: the 11-character video id
+ *  - SoundCloud: "sc:<user>/<track>" (the permalink path)
+ *  - Deezer: "dz:<track id>" (audio comes from the matching YouTube Music track)
+ *  - Apple Music: "am:<track id>" (audio comes from the matching YouTube Music track)
+ */
 @Immutable
 data class Track(
     val id: String,
@@ -15,6 +23,39 @@ data class Track(
     val isVideo: Boolean = false,
 )
 
+enum class MusicSource(val label: String, val shortLabel: String, val prefix: String) {
+    YOUTUBE("YouTube Music", "YouTube", ""),
+    SOUNDCLOUD("SoundCloud", "SoundCloud", "sc:"),
+    DEEZER("Deezer", "Deezer", "dz:"),
+    APPLE("Apple Music", "Apple", "am:"),
+    ;
+
+    /** Catalog-only sources: their audio is DRM-protected, so playback uses a YouTube match. */
+    val playsViaYouTube: Boolean get() = this == DEEZER || this == APPLE
+
+    companion object {
+        fun of(id: String): MusicSource = when {
+            id.startsWith("sc:") -> SOUNDCLOUD
+            id.startsWith("dz:") -> DEEZER
+            id.startsWith("am:") -> APPLE
+            else -> YOUTUBE
+        }
+    }
+}
+
+val Track.source: MusicSource get() = MusicSource.of(id)
+
+val Track.canDownload: Boolean get() = source != MusicSource.SOUNDCLOUD
+
+fun soundCloudUrl(id: String) = "https://soundcloud.com/" + id.removePrefix("sc:")
+
+fun Track.shareUrl(): String = when (source) {
+    MusicSource.YOUTUBE -> "https://music.youtube.com/watch?v=$id"
+    MusicSource.SOUNDCLOUD -> soundCloudUrl(id)
+    MusicSource.DEEZER -> "https://www.deezer.com/track/${id.removePrefix("dz:")}"
+    MusicSource.APPLE -> "https://music.apple.com/song/${id.removePrefix("am:")}"
+}
+
 /** An album or playlist found online. */
 @Immutable
 data class OnlineCollection(
@@ -23,6 +64,7 @@ data class OnlineCollection(
     val subtitle: String,
     val thumbnailUrl: String?,
     val isAlbum: Boolean,
+    val source: MusicSource = MusicSource.YOUTUBE,
 )
 
 fun formatDuration(seconds: Long): String {

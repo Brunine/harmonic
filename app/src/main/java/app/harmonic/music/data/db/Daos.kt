@@ -50,6 +50,10 @@ abstract class SongDao {
     @Query("SELECT * FROM songs WHERE id = :id")
     abstract fun observe(id: String): Flow<SongEntity?>
 
+    /** Blocking variant for player loader threads. */
+    @Query("SELECT * FROM songs WHERE id = :id")
+    abstract fun getBlocking(id: String): SongEntity?
+
     @Query("SELECT * FROM songs WHERE id IN (:ids)")
     abstract suspend fun getAll(ids: List<String>): List<SongEntity>
 
@@ -160,4 +164,16 @@ abstract class FormatDao {
 
     @Query("SELECT * FROM formats WHERE videoId = :id")
     abstract fun get(id: String): FormatEntity?
+}
+
+@Dao
+abstract class MatchDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract fun upsert(match: MatchEntity)
+
+    @Query("SELECT * FROM matches WHERE sourceId = :id")
+    abstract fun get(id: String): MatchEntity?
+
+    @Query("DELETE FROM matches WHERE sourceId = :id")
+    abstract fun delete(id: String)
 }
