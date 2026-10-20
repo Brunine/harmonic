@@ -11,11 +11,38 @@ Every release bumps both numbers in `app/build.gradle.kts`:
 
 | Version | versionCode | Date | Status |
 |---|---|---|---|
-| 1.4.0 | 5 | 2026-10-20 | In testing |
+| 1.5.0 | 6 | 2026-10-20 | In testing |
+| 1.4.0 | 5 | 2026-10-20 | Released |
 | 1.3.0 | 4 | 2026-10-20 | Released |
 | 1.2.0 | 3 | 2026-10-20 | Released |
 | 1.1.0 | 2 | 2026-10-20 | Released |
 | 1.0.0 | 1 | 2026-10-19 | Released |
+
+## [1.5.0] - 2026-10-20
+
+### Added
+- **Like and shuffle buttons in the car**: Android Auto's player screen gets a heart (like or
+  unlike the playing song) and a shuffle button. They also appear in the media notification and
+  on other controllers (lock screen, Wear OS).
+- **Quick picks in Android Auto**: a new first tab with recommendations based on the last song
+  you played, the same list as the Home screen. The last list is kept on the phone, so the tab
+  opens instantly, even without signal, and refreshes in the background (on Wi-Fi, or on mobile
+  data only when there is nothing to show yet).
+- **Covers in the car**: Quick picks and Playlists are shown as a grid of covers, and every
+  playlist shows its first song's cover.
+- **Download liked songs** (Settings → Data & battery, off by default): while on Wi-Fi, every
+  song you like is downloaded by itself, so your likes always play offline. Songs liked on mobile
+  data follow the next time you're on Wi-Fi. Unliking never deletes a download.
+- **Home screen widget**: cover, song, artist and previous / play-pause / next, in the synthwave
+  colours. Tap the cover or title to open the app. Long-press the home screen → Widgets →
+  Harmonic to add it.
+
+### Changed
+- Android Auto tabs are now Quick picks, Recent, Playlists and Downloads. "Liked songs" moved to
+  the first tile inside Playlists (Android Auto shows at most four tabs).
+
+### Notes
+- No database changes: updating from 1.4.0 keeps everything.
 
 ## [1.4.0] - 2026-10-20
 

@@ -18,6 +18,7 @@ class HarmonicApp : Application(), ImageLoaderFactory {
         container.init()
         // Create the download manager on the main thread so it can resume pending downloads.
         container.downloads.downloadManager
+        container.autoDownloader.start()
     }
 
     override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)

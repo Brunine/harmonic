@@ -24,8 +24,10 @@
     <string name="audio_offload">Processamento de áudio dedicado</string>
     <string name="audio_offload_desc">Deixa o chip de áudio decodificar com a tela desligada. Desligue se ouvir falhas</string>
     <string name="audio_quality">Qualidade do áudio</string>
+    <string name="auto_download_liked">Baixar músicas curtidas</string>
+    <string name="auto_download_liked_desc">No Wi-Fi, as músicas que você curte são baixadas sozinhas para ouvir offline</string>
     <string name="auto_downloads">Downloads</string>
-    <string name="auto_liked">Curtidas</string>
+    <string name="auto_liked">Músicas curtidas</string>
     <string name="auto_playlists">Playlists</string>
     <string name="auto_recent">Recentes</string>
     <string name="autoplay">Tocar músicas parecidas</string>
@@ -276,6 +278,9 @@
     <string name="turn_on">Ligar</string>
     <string name="unlike">Remover das curtidas</string>
     <string name="unsupported_link">Link não suportado</string>
+    <string name="widget_description">Capa, música e botões de reprodução</string>
+    <string name="widget_idle">Toque para começar a ouvir</string>
+    <string name="widget_name">Player do Harmonic</string>
     <string name="wifi_only_downloads">Baixar só no Wi-Fi</string>
     <string name="wifi_only_downloads_desc">Os downloads na fila esperam uma rede sem limite de dados</string>
     <plurals name="add_songs_to_playlist">

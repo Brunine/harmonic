@@ -25,8 +25,10 @@
     <string name="audio_offload">Audio offload</string>
     <string name="audio_offload_desc">Lets the phone\'s audio chip decode with the screen off. Turn off if you hear glitches</string>
     <string name="audio_quality">Audio quality</string>
+    <string name="auto_download_liked">Download liked songs</string>
+    <string name="auto_download_liked_desc">On Wi-Fi, songs you like are saved for offline listening by themselves</string>
     <string name="auto_downloads">Downloads</string>
-    <string name="auto_liked">Liked</string>
+    <string name="auto_liked">Liked songs</string>
     <string name="auto_playlists">Playlists</string>
     <string name="auto_recent">Recent</string>
     <string name="autoplay">Autoplay similar songs</string>
@@ -277,6 +279,9 @@
     <string name="turn_on">Turn on</string>
     <string name="unlike">Remove from liked</string>
     <string name="unsupported_link">Unsupported link</string>
+    <string name="widget_description">Cover, song and playback buttons</string>
+    <string name="widget_idle">Tap to start listening</string>
+    <string name="widget_name">Harmonic player</string>
     <string name="wifi_only_downloads">Download only on Wi-Fi</string>
     <string name="wifi_only_downloads_desc">Queued downloads wait for an unmetered network</string>
     <plurals name="add_songs_to_playlist">

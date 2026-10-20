@@ -35,6 +35,8 @@ import app.harmonic.music.data.backup.BackupManager
 import app.harmonic.music.data.prefs.SearchHistory
 import app.harmonic.music.playback.RoutingDataSource
 import app.harmonic.music.playback.SleepTimer
+import app.harmonic.music.data.QuickPicks
+import app.harmonic.music.download.AutoDownloader
 import app.harmonic.music.playback.Normalizer
 import app.harmonic.music.playback.VolumeMixer
 import app.harmonic.music.playback.StreamResolver
@@ -180,6 +182,10 @@ class AppContainer(private val app: Application) {
     val sleepTimer = SleepTimer(volume)
     val backup by lazy { BackupManager(app, this) }
     val searchHistory by lazy { SearchHistory(app) }
+    val quickPicks by lazy {
+        QuickPicks(app, db.songDao(), { catalog }, ::isMetered, ::hasNetwork, appScope)
+    }
+    val autoDownloader by lazy { AutoDownloader(app, db.songDao(), settings, { downloads }, appScope) }
 
     fun init() {
         val locale = Locale.getDefault()
