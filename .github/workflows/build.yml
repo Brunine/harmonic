@@ -38,6 +38,16 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease --stacktrace
 
+      - name: Show signing certificate
+        run: |
+          APKSIGNER="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner"
+          for apk in app/build/outputs/apk/release/*.apk; do
+            "$APKSIGNER" verify --print-certs "$apk"
+          done
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::No signing secrets set: this APK uses a throwaway debug key and can't update an installed copy."
+          fi
+
       - uses: actions/upload-artifact@v7
         with:
           name: harmonic-release-apk
