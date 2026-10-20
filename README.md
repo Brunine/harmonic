@@ -133,6 +133,15 @@ data/
 Read path for audio: **download cache → streaming cache → resolve URL → network**. Everything is
 keyed by video id, so a song downloaded once plays offline wherever it appears.
 
+## Releasing a new version
+
+1. In `app/build.gradle.kts`, raise `versionCode` by 1 and update `versionName`
+   (rules at the top of [CHANGELOG.md](CHANGELOG.md)).
+2. Add a section to `CHANGELOG.md` describing what changed.
+3. Commit on a branch, open a pull request, and wait for the **Build APK** check to pass.
+4. Merge, then tag it: `git tag v1.2.0 && git push origin v1.2.0`.
+5. Install on the phone, keeping data: `adb -d install -r app-release.apk`.
+
 ## Maintenance notes
 
 - **YouTube changes break extraction regularly.** The fix is almost always bumping
