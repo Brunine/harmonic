@@ -22,6 +22,14 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.unit.dp
+import app.harmonic.music.ui.components.neonBrush
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -206,7 +214,8 @@ fun HarmonicRoot(container: AppContainer, sharedText: MutableStateFlow<String?>)
                 if (showChrome) {
                     Column {
                         MiniPlayer(onOpen = { nav.navigate(Routes.PLAYER) { launchSingleTop = true } })
-                        NavigationBar {
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(neonBrush()))
+                        NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
                             bottomTabs.forEach { tab ->
                                 NavigationBarItem(
                                     selected = backStack?.destination?.route == tab.route,
@@ -224,7 +233,12 @@ fun HarmonicRoot(container: AppContainer, sharedText: MutableStateFlow<String?>)
                                             Icon(tab.icon, null)
                                         }
                                     },
-                                    label = { Text(tab.label) },
+                                    label = { Text(tab.label.uppercase(), style = MaterialTheme.typography.labelSmall) },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = MaterialTheme.colorScheme.tertiary,
+                                        selectedTextColor = MaterialTheme.colorScheme.tertiary,
+                                        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                                    ),
                                 )
                             }
                         }

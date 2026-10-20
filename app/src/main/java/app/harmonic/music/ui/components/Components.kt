@@ -1,6 +1,7 @@
 package app.harmonic.music.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -84,7 +85,7 @@ fun TrackRow(
     modifier: Modifier = Modifier,
     isCurrent: Boolean = false,
     leadingIndex: Int? = null,
-    showSource: Boolean = false,
+    showSource: Boolean = true,
 ) {
     val download = LocalDownloadStates.current[track.id]
     Row(
@@ -123,7 +124,7 @@ fun TrackRow(
                     )
                 }
                 if (track.isVideo) SmallIcon(Icons.Filled.OndemandVideo)
-                if (showSource || track.source != MusicSource.YOUTUBE) SourceBadge(track.source)
+                if (showSource) SourceBadge(track.source)
                 Text(
                     listOf(track.artist, formatDuration(track.durationSec)).filter { it.isNotEmpty() }.joinToString(" • "),
                     maxLines = 1,
@@ -139,18 +140,21 @@ fun TrackRow(
     }
 }
 
-/** Small label showing where a result came from ("SoundCloud", "Deezer"...). */
+/** Small coloured label showing where a song came from ("SoundCloud", "Deezer"...). */
 @Composable
 fun SourceBadge(source: MusicSource) {
+    val color = source.color()
     Text(
         source.shortLabel,
         style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSecondaryContainer,
+        color = color,
+        maxLines = 1,
         modifier = Modifier
-            .padding(end = 4.dp)
+            .padding(end = 6.dp)
             .clip(RoundedCornerShape(4.dp))
-            .background(MaterialTheme.colorScheme.secondaryContainer)
-            .padding(horizontal = 4.dp, vertical = 1.dp),
+            .border(1.dp, color.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
+            .background(color.copy(alpha = 0.12f))
+            .padding(horizontal = 5.dp, vertical = 1.dp),
     )
 }
 
@@ -196,11 +200,15 @@ fun SectionHeader(title: String, modifier: Modifier = Modifier, action: (@Compos
     Row(
         modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 8.dp, top = 20.dp, bottom = 8.dp),
+            .padding(start = 16.dp, end = 8.dp, top = 22.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Column {
+            Text(title.uppercase(), style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.size(6.dp))
+            NeonUnderline()
+        }
         action?.invoke()
     }
 }

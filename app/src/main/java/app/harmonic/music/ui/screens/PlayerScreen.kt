@@ -35,13 +35,10 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -63,7 +60,12 @@ import app.harmonic.music.data.model.formatDuration
 import app.harmonic.music.ui.LocalContainer
 import app.harmonic.music.ui.LocalDownloadStates
 import app.harmonic.music.ui.LocalUiActions
-import app.harmonic.music.ui.components.Artwork
+import app.harmonic.music.data.model.source
+import app.harmonic.music.ui.components.NeonArtwork
+import app.harmonic.music.ui.components.NeonPlayButton
+import app.harmonic.music.ui.components.NeonSeekBar
+import app.harmonic.music.ui.components.RetroBackdrop
+import app.harmonic.music.ui.components.SourceLine
 import app.harmonic.music.ui.components.TrackRow
 import app.harmonic.music.ui.toggleLike
 import kotlinx.coroutines.Dispatchers
@@ -89,150 +91,131 @@ fun PlayerScreen(onClose: () -> Unit) {
     val download = LocalDownloadStates.current[current.id]
     val (position, duration) = progress
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .systemBarsPadding()
-            .padding(horizontal = 24.dp),
-    ) {
-        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onClose) { Icon(Icons.Filled.KeyboardArrowDown, "Close") }
-            Text(
-                "Now playing",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            IconButton(onClick = { actions.openTrackMenu(current, emptyList()) }) { Icon(Icons.Filled.MoreVert, "More") }
-        }
-
-        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Artwork(
-                current.thumbnailUrl,
-                Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true),
-                corner = 16.dp,
-            )
-        }
-
-        Spacer(Modifier.height(24.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    current.title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    current.artist,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            IconButton(onClick = { c.appScope.launch(Dispatchers.Main) { c.toggleLike(current) } }) {
-                val liked = song?.liked == true
-                Icon(
-                    if (liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                    if (liked) "Unlike" else "Like",
-                    tint = if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                )
-            }
-        }
-
-        Spacer(Modifier.height(12.dp))
-        val sliderValue = dragPosition ?: if (duration > 0) position.toFloat() / duration else 0f
-        Slider(
-            value = sliderValue.coerceIn(0f, 1f),
-            onValueChange = { dragPosition = it },
-            onValueChangeFinished = {
-                dragPosition?.let { connection.seekTo((it * duration).toLong()) }
-                dragPosition = null
-            },
-            enabled = duration > 0,
-        )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            val shown = dragPosition?.let { (it * duration).toLong() } ?: position
-            Text(formatDuration(shown / 1000), style = MaterialTheme.typography.bodySmall)
-            Text(formatDuration(duration / 1000), style = MaterialTheme.typography.bodySmall)
-        }
-
-        Spacer(Modifier.height(8.dp))
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+    Box(Modifier.fillMaxSize()) {
+        RetroBackdrop(Modifier.fillMaxSize())
+        Column(
+            Modifier
+                .fillMaxSize()
+                .systemBarsPadding()
+                .padding(horizontal = 24.dp),
         ) {
-            IconButton(onClick = connection::toggleShuffle) {
-                Icon(
-                    Icons.Filled.Shuffle, "Shuffle",
-                    tint = if (state.shuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onClose) { Icon(Icons.Filled.KeyboardArrowDown, "Close") }
+                SourceLine(current.source, Modifier.weight(1f))
+                IconButton(onClick = { actions.openTrackMenu(current, emptyList()) }) { Icon(Icons.Filled.MoreVert, "More") }
+            }
+
+            Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                NeonArtwork(
+                    current.thumbnailUrl,
+                    Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true),
                 )
             }
-            IconButton(onClick = connection::previous, modifier = Modifier.size(56.dp)) {
-                Icon(Icons.Filled.SkipPrevious, "Previous", Modifier.size(36.dp))
-            }
-            Box(contentAlignment = Alignment.Center) {
-                FilledIconButton(
-                    onClick = connection::togglePlayPause,
-                    modifier = Modifier.size(72.dp),
-                    shape = CircleShape,
-                    colors = IconButtonDefaults.filledIconButtonColors(),
-                ) {
-                    Icon(
-                        if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        if (state.isPlaying) "Pause" else "Play",
-                        Modifier.size(40.dp),
+
+            Spacer(Modifier.height(20.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        current.title.uppercase(),
+                        style = MaterialTheme.typography.headlineSmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        current.artist,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (state.isBuffering) {
-                    CircularProgressIndicator(Modifier.size(80.dp), strokeWidth = 2.dp)
+                IconButton(onClick = { c.appScope.launch(Dispatchers.Main) { c.toggleLike(current) } }) {
+                    val liked = song?.liked == true
+                    Icon(
+                        if (liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                        if (liked) "Unlike" else "Like",
+                        tint = if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    )
                 }
             }
-            IconButton(onClick = connection::next, enabled = state.hasNext, modifier = Modifier.size(56.dp)) {
-                Icon(Icons.Filled.SkipNext, "Next", Modifier.size(36.dp))
-            }
-            IconButton(onClick = connection::cycleRepeat) {
-                Icon(
-                    if (state.repeatMode == Player.REPEAT_MODE_ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
-                    "Repeat",
-                    tint = if (state.repeatMode != Player.REPEAT_MODE_OFF) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-            }
-        }
 
-        Spacer(Modifier.height(8.dp))
-        Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-            IconButton(onClick = {
-                when {
-                    download?.isDone == true -> actions.showMessage("Available offline")
-                    download?.isActive == true -> actions.showMessage("Downloading… ${download.percent.toInt()}%")
-                    else -> {
-                        if (c.downloads.download(listOf(current)) > 0) {
-                            actions.showMessage("SoundCloud tracks can't be downloaded")
+            Spacer(Modifier.height(12.dp))
+            val fraction = dragPosition ?: if (duration > 0) position.toFloat() / duration else 0f
+            NeonSeekBar(
+                fraction = fraction,
+                enabled = duration > 0,
+                onDrag = { dragPosition = it },
+                onRelease = {
+                    connection.seekTo((it * duration).toLong())
+                    dragPosition = null
+                },
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                val shown = dragPosition?.let { (it * duration).toLong() } ?: position
+                Text(formatDuration(shown / 1000), style = MaterialTheme.typography.labelMedium)
+                Text(formatDuration(duration / 1000), style = MaterialTheme.typography.labelMedium)
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = connection::toggleShuffle) {
+                    Icon(
+                        Icons.Filled.Shuffle, "Shuffle",
+                        tint = if (state.shuffle) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(onClick = connection::previous, modifier = Modifier.size(56.dp)) {
+                    Icon(Icons.Filled.SkipPrevious, "Previous", Modifier.size(36.dp))
+                }
+                NeonPlayButton(state.isPlaying, state.isBuffering, connection::togglePlayPause)
+                IconButton(onClick = connection::next, enabled = state.hasNext, modifier = Modifier.size(56.dp)) {
+                    Icon(Icons.Filled.SkipNext, "Next", Modifier.size(36.dp))
+                }
+                IconButton(onClick = connection::cycleRepeat) {
+                    Icon(
+                        if (state.repeatMode == Player.REPEAT_MODE_ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+                        "Repeat",
+                        tint = if (state.repeatMode != Player.REPEAT_MODE_OFF) {
+                            MaterialTheme.colorScheme.tertiary
                         } else {
-                            actions.showMessage("Downloading “${current.title}”")
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                IconButton(onClick = {
+                    when {
+                        download?.isDone == true -> actions.showMessage("Available offline")
+                        download?.isActive == true -> actions.showMessage("Downloading… ${download.percent.toInt()}%")
+                        else -> {
+                            if (c.downloads.download(listOf(current)) > 0) {
+                                actions.showMessage("SoundCloud tracks can't be downloaded")
+                            } else {
+                                actions.showMessage("Downloading “${current.title}”")
+                            }
                         }
                     }
+                }) {
+                    Icon(
+                        if (download?.isDone == true) Icons.Filled.DownloadDone else Icons.Filled.Download,
+                        "Download",
+                        tint = if (download?.isDone == true) MaterialTheme.colorScheme.tertiary else Color.Unspecified,
+                    )
                 }
-            }) {
-                Icon(
-                    if (download?.isDone == true) Icons.Filled.DownloadDone else Icons.Filled.Download,
-                    "Download",
-                    tint = if (download?.isDone == true) MaterialTheme.colorScheme.primary else Color.Unspecified,
-                )
-            }
-            IconButton(onClick = { actions.addToPlaylist(listOf(current)) }) {
-                Icon(Icons.AutoMirrored.Filled.PlaylistAdd, "Add to playlist")
-            }
-            IconButton(onClick = { showQueue = true }) {
-                Icon(Icons.AutoMirrored.Filled.QueueMusic, "Queue")
+                IconButton(onClick = { actions.addToPlaylist(listOf(current)) }) {
+                    Icon(Icons.AutoMirrored.Filled.PlaylistAdd, "Add to playlist")
+                }
+                IconButton(onClick = { showQueue = true }) {
+                    Icon(Icons.AutoMirrored.Filled.QueueMusic, "Queue")
+                }
             }
         }
     }

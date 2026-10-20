@@ -4,7 +4,11 @@ import app.harmonic.music.data.model.MusicSource
 import app.harmonic.music.data.model.Track
 import app.harmonic.music.data.model.source
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.schabi.newpipe.extractor.Page
@@ -59,6 +63,24 @@ class CatalogRepository(
                     else if (filter.key == "album") apple.searchAlbums(query) else apple.searchSongs(query)
             }
         }
+
+    /**
+     * Songs from every source at once, interleaved (YouTube, SoundCloud, Deezer, Apple, YouTube...)
+     * so each source shows near the top. A source that fails or times out is simply left out.
+     */
+    suspend fun searchAll(query: String, perSource: Int = 8): SearchPage = coroutineScope {
+        val searches = MusicSource.entries.map { source ->
+            async {
+                withTimeoutOrNull(12_000) {
+                    runCatching { search(source, filters(source).first(), query).items }.getOrNull()
+                }.orEmpty().filterIsInstance<SearchResult.Song>().take(perSource)
+            }
+        }
+        val lists = searches.awaitAll()
+        val merged = ArrayList<SearchResult>()
+        for (i in 0 until perSource) lists.forEach { list -> list.getOrNull(i)?.let { merged += it } }
+        SearchPage(merged.distinctBy { (it as SearchResult.Song).track.id }, null)
+    }
 
     /** YouTube Music songs; used by Android Auto voice search. */
     suspend fun searchSongs(query: String): List<Track> =

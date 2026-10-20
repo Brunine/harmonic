@@ -65,6 +65,7 @@ class PlaybackService : MediaLibraryService() {
     private lateinit var player: ExoPlayer
     private lateinit var session: MediaLibrarySession
     private lateinit var tree: LibraryTree
+    private lateinit var interruptions: InterruptionHandler
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val prefs by lazy { getSharedPreferences("queue", MODE_PRIVATE) }
 
@@ -86,7 +87,8 @@ class PlaybackService : MediaLibraryService() {
                     .setUsage(C.USAGE_MEDIA)
                     .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
                     .build(),
-                /* handleAudioFocus = */ true,
+                // Audio focus is handled by InterruptionHandler, following the user's settings.
+                /* handleAudioFocus = */ false,
             )
             .setHandleAudioBecomingNoisy(true)
             // Holds a Wi-Fi lock only while actually playing streamed content.
@@ -96,6 +98,7 @@ class PlaybackService : MediaLibraryService() {
             .setSeekForwardIncrementMs(10_000)
             .build()
         player.addListener(listener)
+        interruptions = InterruptionHandler(this, player) { app.settings.current }.also { it.start() }
         applyTrackParameters(app.settings.current.audioOffload)
 
         val sessionActivity = PendingIntent.getActivity(
@@ -128,6 +131,7 @@ class PlaybackService : MediaLibraryService() {
         saveQueueNow()
         scope.cancel()
         session.release()
+        interruptions.release()
         player.removeListener(listener)
         player.release()
         super.onDestroy()

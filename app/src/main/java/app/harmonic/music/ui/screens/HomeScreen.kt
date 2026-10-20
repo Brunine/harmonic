@@ -43,6 +43,7 @@ import app.harmonic.music.ui.LocalUiActions
 import app.harmonic.music.ui.Routes
 import app.harmonic.music.ui.components.Artwork
 import app.harmonic.music.ui.components.EmptyState
+import app.harmonic.music.ui.components.HarmonicLogo
 import app.harmonic.music.ui.components.SectionHeader
 import app.harmonic.music.ui.components.TrackRow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -97,7 +98,7 @@ fun HomeScreen() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Harmonic", fontWeight = FontWeight.Bold) },
+                title = { HarmonicLogo() },
                 actions = {
                     IconButton(onClick = { actions.navigate(Routes.SETTINGS) }) { Icon(Icons.Filled.Settings, "Settings") }
                 },

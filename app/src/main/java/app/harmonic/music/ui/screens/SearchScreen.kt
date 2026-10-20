@@ -57,17 +57,22 @@ import app.harmonic.music.ui.Routes
 import app.harmonic.music.ui.components.CollectionRow
 import app.harmonic.music.ui.components.EmptyState
 import app.harmonic.music.ui.components.TrackRow
+import app.harmonic.music.ui.components.color
+import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
+private val ALL_FILTER = CatalogFilter("Songs", "all")
+
 class SearchViewModel(private val c: AppContainer) : ViewModel() {
     var query by mutableStateOf("")
         private set
-    var source by mutableStateOf(MusicSource.YOUTUBE)
+    /** null = all sources at once. */
+    var source by mutableStateOf<MusicSource?>(null)
         private set
-    var filter by mutableStateOf(c.catalog.filters(MusicSource.YOUTUBE).first())
+    var filter by mutableStateOf(ALL_FILTER)
         private set
     var submitted by mutableStateOf<String?>(null)
         private set
@@ -81,7 +86,7 @@ class SearchViewModel(private val c: AppContainer) : ViewModel() {
     private var suggestJob: Job? = null
     private var searchJob: Job? = null
 
-    fun filters(): List<CatalogFilter> = c.catalog.filters(source)
+    fun filters(): List<CatalogFilter> = source?.let { c.catalog.filters(it) } ?: listOf(ALL_FILTER)
 
     fun onQueryChange(q: String) {
         query = q
@@ -111,7 +116,7 @@ class SearchViewModel(private val c: AppContainer) : ViewModel() {
         val f = filter
         searchJob = viewModelScope.launch {
             loading.value = true
-            runCatching { c.catalog.search(src, f, text) }
+            runCatching { if (src == null) c.catalog.searchAll(text) else c.catalog.search(src, f, text) }
                 .onSuccess {
                     results.value = it.items
                     next = it.next
@@ -121,10 +126,10 @@ class SearchViewModel(private val c: AppContainer) : ViewModel() {
         }
     }
 
-    fun selectSource(s: MusicSource) {
+    fun selectSource(s: MusicSource?) {
         if (s == source) return
         source = s
-        filter = c.catalog.filters(s).first()
+        filter = s?.let { c.catalog.filters(it).first() } ?: ALL_FILTER
         submitted?.let { search(it) }
     }
 
@@ -138,7 +143,7 @@ class SearchViewModel(private val c: AppContainer) : ViewModel() {
         val token = next ?: return
         val text = submitted ?: return
         if (loading.value) return
-        val src = source
+        val src = source ?: return
         val f = filter
         searchJob = viewModelScope.launch {
             loading.value = true
@@ -194,9 +199,14 @@ fun SearchScreen() {
         )
 
         // Where results come from
-        SecondaryScrollableTabRow(selectedTabIndex = vm.source.ordinal, edgePadding = 16.dp) {
-            MusicSource.entries.forEach { s ->
-                Tab(selected = vm.source == s, onClick = { vm.selectSource(s) }, text = { Text(s.label) })
+        val tabs: List<MusicSource?> = listOf(null) + MusicSource.entries
+        SecondaryScrollableTabRow(selectedTabIndex = tabs.indexOf(vm.source), edgePadding = 16.dp) {
+            tabs.forEach { s ->
+                Tab(
+                    selected = vm.source == s,
+                    onClick = { vm.selectSource(s) },
+                    text = { Text(s?.label ?: "All sources", color = s?.color() ?: Color.Unspecified) },
+                )
             }
         }
 
@@ -209,14 +219,22 @@ fun SearchScreen() {
             }
         }
 
-        if (vm.source.playsViaYouTube) {
+        val src = vm.source
+        if (src == null) {
             Text(
-                "${vm.source.label} songs play using the matching YouTube Music track.",
+                "Searching YouTube Music, SoundCloud, Deezer and Apple Music. Each song shows where it comes from.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
             )
-        } else if (vm.source == MusicSource.SOUNDCLOUD) {
+        } else if (src.playsViaYouTube) {
+            Text(
+                "${src.label} songs play using the matching YouTube Music track.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+            )
+        } else if (src == MusicSource.SOUNDCLOUD) {
             Text(
                 "SoundCloud tracks stream directly. Go+ tracks and downloads aren't supported.",
                 style = MaterialTheme.typography.bodySmall,
@@ -249,7 +267,7 @@ fun SearchScreen() {
 
                 vm.submitted == null -> EmptyState(
                     Icons.Filled.Search,
-                    "Search ${vm.source.label}",
+                    "Search ${src?.label ?: "every source"}",
                     "Results play as audio only. Pick a source above; each result shows where it came from.",
                 )
 

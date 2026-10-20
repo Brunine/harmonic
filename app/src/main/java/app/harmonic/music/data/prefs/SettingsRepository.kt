@@ -22,10 +22,14 @@ enum class AudioQuality(val label: String, val description: String) {
     HIGH("High", "Best available, ~160 kbps Opus"),
 }
 
+/** What the music does when something else needs the sound. */
+enum class InterruptAction(val label: String) { PAUSE("Pause"), LOWER("Lower volume"), KEEP("Keep playing") }
+
 enum class ThemeMode(val label: String) { SYSTEM("Follow system"), LIGHT("Light"), DARK("Dark") }
 
 /** Colour palettes. [seed] is the key colour the whole scheme is derived from. */
 enum class ThemePalette(val label: String, val seed: Long?) {
+    SYNTHWAVE("Synthwave (Harmonic)", 0xFFFF2E97),
     WALLPAPER("Wallpaper colours", null),
     ALBUM("Current song's cover", null),
     EMBER("Ember", 0xFFFF6B4A),
@@ -47,12 +51,18 @@ data class AppSettings(
     val autoplayRelated: Boolean = true,
     val audioOffload: Boolean = true,
     val dataSaverImages: Boolean = true,
-    val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val palette: ThemePalette = ThemePalette.EMBER,
+    val themeMode: ThemeMode = ThemeMode.DARK,
+    val palette: ThemePalette = ThemePalette.SYNTHWAVE,
     /** True black backgrounds in dark mode: saves battery on OLED screens. */
     val pureBlack: Boolean = false,
     /** Name shown to friends in a Jam; empty means the phone model. */
     val jamName: String = "",
+    val onCalls: InterruptAction = InterruptAction.PAUSE,
+    val onRecording: InterruptAction = InterruptAction.PAUSE,
+    val onOtherSounds: InterruptAction = InterruptAction.PAUSE,
+    val onNavigation: InterruptAction = InterruptAction.LOWER,
+    val onOtherMusic: InterruptAction = InterruptAction.PAUSE,
+    val resumeAfterInterruption: Boolean = true,
 )
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
@@ -74,10 +84,18 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         val palette = stringPreferencesKey("palette")
         val pureBlack = booleanPreferencesKey("pure_black")
         val jamName = stringPreferencesKey("jam_name")
+        val onCalls = stringPreferencesKey("on_calls")
+        val onRecording = stringPreferencesKey("on_recording")
+        val onOtherSounds = stringPreferencesKey("on_other_sounds")
+        val onNavigation = stringPreferencesKey("on_navigation")
+        val onOtherMusic = stringPreferencesKey("on_other_music")
+        val resumeAfterInterruption = booleanPreferencesKey("resume_after_interruption")
     }
 
     private fun Preferences.toSettings(): AppSettings {
         val d = AppSettings()
+        fun action(key: Preferences.Key<String>, def: InterruptAction) =
+            this[key]?.let { runCatching { InterruptAction.valueOf(it) }.getOrNull() } ?: def
         fun q(key: Preferences.Key<String>, def: AudioQuality) =
             this[key]?.let { runCatching { AudioQuality.valueOf(it) }.getOrNull() } ?: def
         return AppSettings(
@@ -94,6 +112,12 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
             palette = this[Keys.palette]?.let { runCatching { ThemePalette.valueOf(it) }.getOrNull() } ?: d.palette,
             pureBlack = this[Keys.pureBlack] ?: d.pureBlack,
             jamName = this[Keys.jamName] ?: d.jamName,
+            onCalls = action(Keys.onCalls, d.onCalls),
+            onRecording = action(Keys.onRecording, d.onRecording),
+            onOtherSounds = action(Keys.onOtherSounds, d.onOtherSounds),
+            onNavigation = action(Keys.onNavigation, d.onNavigation),
+            onOtherMusic = action(Keys.onOtherMusic, d.onOtherMusic),
+            resumeAfterInterruption = this[Keys.resumeAfterInterruption] ?: d.resumeAfterInterruption,
         )
     }
 
@@ -123,5 +147,11 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
     suspend fun setThemeMode(v: ThemeMode) = store.edit { it[Keys.themeMode] = v.name }
     suspend fun setPalette(v: ThemePalette) = store.edit { it[Keys.palette] = v.name }
     suspend fun setPureBlack(v: Boolean) = store.edit { it[Keys.pureBlack] = v }
+    suspend fun setOnCalls(v: InterruptAction) = store.edit { it[Keys.onCalls] = v.name }
+    suspend fun setOnRecording(v: InterruptAction) = store.edit { it[Keys.onRecording] = v.name }
+    suspend fun setOnOtherSounds(v: InterruptAction) = store.edit { it[Keys.onOtherSounds] = v.name }
+    suspend fun setOnNavigation(v: InterruptAction) = store.edit { it[Keys.onNavigation] = v.name }
+    suspend fun setOnOtherMusic(v: InterruptAction) = store.edit { it[Keys.onOtherMusic] = v.name }
+    suspend fun setResumeAfterInterruption(v: Boolean) = store.edit { it[Keys.resumeAfterInterruption] = v }
     suspend fun setJamName(v: String) = store.edit { it[Keys.jamName] = v.trim().take(30) }
 }

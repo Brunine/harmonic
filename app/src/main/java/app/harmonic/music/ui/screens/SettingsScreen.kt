@@ -36,8 +36,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
+import android.content.Intent
+import androidx.compose.runtime.mutableIntStateOf
 import app.harmonic.music.BuildConfig
+import app.harmonic.music.CrashLog
+import app.harmonic.music.data.prefs.AppSettings
 import app.harmonic.music.data.prefs.AudioQuality
+import app.harmonic.music.data.prefs.InterruptAction
 import app.harmonic.music.data.prefs.ThemeMode
 import app.harmonic.music.data.prefs.ThemePalette
 import app.harmonic.music.ui.theme.paletteSwatch
@@ -68,6 +73,8 @@ fun SettingsScreen(onBack: () -> Unit) {
     var qualityDialog by remember { mutableStateOf<QualityTarget?>(null) }
     var cacheDialog by remember { mutableStateOf(false) }
     var themeDialog by remember { mutableStateOf(false) }
+    var interruptDialog by remember { mutableStateOf<InterruptTarget?>(null) }
+    var crashCount by remember { mutableIntStateOf(CrashLog.reports(context).size) }
     var paletteDialog by remember { mutableStateOf(false) }
     var cacheUsed by remember { mutableLongStateOf(-1L) }
     var downloadsUsed by remember { mutableLongStateOf(-1L) }
@@ -151,6 +158,16 @@ fun SettingsScreen(onBack: () -> Unit) {
                 s.sponsorBlock,
             ) { runAsync { c.settings.setSponsorBlock(it) } }
 
+            Header("When something else needs the sound")
+            InterruptTarget.entries.forEach { target ->
+                ClickRow(target.title, "${target.current(s).label} · ${target.example}") { interruptDialog = target }
+            }
+            SwitchRow(
+                "Resume afterwards",
+                "Start the music again when the call, recording or other sound ends",
+                s.resumeAfterInterruption,
+            ) { runAsync { c.settings.setResumeAfterInterruption(it) } }
+
             Header("Account")
             if (signedIn) {
                 ClickRow(
@@ -162,6 +179,31 @@ fun SettingsScreen(onBack: () -> Unit) {
                 ClickRow("Sign in with Google", "Optional. Only needed to play age-restricted tracks") {
                     actions.navigate(Routes.LOGIN)
                 }
+            }
+
+            Header("Crash reports")
+            if (crashCount > 0) {
+                ClickRow(
+                    "Share latest crash report",
+                    "$crashCount saved. Send it to whoever fixes the app",
+                ) {
+                    CrashLog.latest(context)?.let { report ->
+                        val send = Intent(Intent.ACTION_SEND)
+                            .setType("text/plain")
+                            .putExtra(Intent.EXTRA_SUBJECT, "Harmonic crash report")
+                            .putExtra(Intent.EXTRA_TEXT, report)
+                        context.startActivity(Intent.createChooser(send, null))
+                    }
+                }
+                ClickRow("Delete crash reports", "They're only stored on this phone") {
+                    CrashLog.clear(context)
+                    crashCount = 0
+                }
+            } else {
+                ListItem(
+                    headlineContent = { Text("No crashes recorded") },
+                    supportingContent = { Text("If the app ever crashes, a report appears here to share") },
+                )
             }
 
             Header("About")
@@ -192,6 +234,26 @@ fun SettingsScreen(onBack: () -> Unit) {
                     QualityTarget.WIFI -> c.settings.setQualityWifi(q)
                     QualityTarget.MOBILE -> c.settings.setQualityMobile(q)
                     QualityTarget.DOWNLOAD -> c.settings.setQualityDownload(q)
+                }
+            }
+        }
+    }
+
+    interruptDialog?.let { target ->
+        ChoiceDialog(
+            title = target.title,
+            options = target.options.map { it to it.label },
+            selected = target.current(s),
+            onDismiss = { interruptDialog = null },
+        ) { action ->
+            interruptDialog = null
+            runAsync {
+                when (target) {
+                    InterruptTarget.CALLS -> c.settings.setOnCalls(action)
+                    InterruptTarget.RECORDING -> c.settings.setOnRecording(action)
+                    InterruptTarget.OTHER_SOUNDS -> c.settings.setOnOtherSounds(action)
+                    InterruptTarget.NAVIGATION -> c.settings.setOnNavigation(action)
+                    InterruptTarget.OTHER_MUSIC -> c.settings.setOnOtherMusic(action)
                 }
             }
         }
@@ -279,6 +341,31 @@ private fun PaletteDialog(selected: ThemePalette, onDismiss: () -> Unit, onSelec
         confirmButton = {},
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
+}
+
+private enum class InterruptTarget(
+    val title: String,
+    val example: String,
+    val options: List<InterruptAction> = InterruptAction.entries,
+) {
+    CALLS("Calls", "phone and WhatsApp-type calls, ringing or ongoing"),
+    RECORDING("Recording", "voice messages, videos"),
+    OTHER_SOUNDS("Other apps' short sounds", "playing a voice message, a video preview"),
+    NAVIGATION("Navigation & Assistant", "Maps, Waze, Google Assistant prompts"),
+    OTHER_MUSIC(
+        "Another music or video app",
+        "on Android 12+ the system fades the music out anyway",
+        listOf(InterruptAction.PAUSE, InterruptAction.KEEP),
+    ),
+    ;
+
+    fun current(s: AppSettings): InterruptAction = when (this) {
+        CALLS -> s.onCalls
+        RECORDING -> s.onRecording
+        OTHER_SOUNDS -> s.onOtherSounds
+        NAVIGATION -> s.onNavigation
+        OTHER_MUSIC -> s.onOtherMusic
+    }
 }
 
 private enum class QualityTarget(val title: String) {
