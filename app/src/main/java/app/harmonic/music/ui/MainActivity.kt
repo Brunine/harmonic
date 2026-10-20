@@ -63,6 +63,8 @@ import app.harmonic.music.data.model.Track
 import app.harmonic.music.ui.components.AddToPlaylistDialog
 import app.harmonic.music.ui.components.MiniPlayer
 import app.harmonic.music.ui.components.TrackMenuSheet
+import app.harmonic.music.ui.screens.AlbumScreen
+import app.harmonic.music.ui.screens.ArtistScreen
 import app.harmonic.music.ui.screens.HomeScreen
 import app.harmonic.music.ui.screens.LibraryScreen
 import app.harmonic.music.ui.screens.LoginScreen
@@ -193,7 +195,13 @@ fun HarmonicRoot(container: AppContainer, sharedText: MutableStateFlow<String?>)
                         container.playerConnection.play(listOf(target.track))
                         if (!container.jam.isGuest) nav.navigate(Routes.PLAYER) { launchSingleTop = true }
                     }
-                    is CatalogRepository.LinkTarget.Collection -> nav.navigate(Routes.online(target.url))
+                    is CatalogRepository.LinkTarget.Collection -> {
+                        val listId = target.url.substringAfter("list=", "").substringBefore('&')
+                        // YouTube Music album links open the album page.
+                        nav.navigate(if (listId.startsWith("OLAK")) Routes.album(listId) else Routes.online(target.url))
+                    }
+                    is CatalogRepository.LinkTarget.Artist -> nav.navigate(Routes.artist(target.id))
+                    is CatalogRepository.LinkTarget.Album -> nav.navigate(Routes.album(target.id))
                     null -> actions.showMessage(res.getString(R.string.unsupported_link))
                 }
             }
@@ -267,6 +275,18 @@ fun HarmonicRoot(container: AppContainer, sharedText: MutableStateFlow<String?>)
                     arguments = listOf(navArgument("id") { type = NavType.LongType }),
                 ) { entry ->
                     PlaylistScreen(entry.arguments?.getLong("id") ?: 0L, onBack = { nav.popBackStack() })
+                }
+                composable(
+                    Routes.ARTIST,
+                    arguments = listOf(navArgument("id") { type = NavType.StringType }),
+                ) { entry ->
+                    ArtistScreen(entry.arguments?.getString("id").orEmpty(), onBack = { nav.popBackStack() })
+                }
+                composable(
+                    Routes.ALBUM,
+                    arguments = listOf(navArgument("id") { type = NavType.StringType }),
+                ) { entry ->
+                    AlbumScreen(entry.arguments?.getString("id").orEmpty(), onBack = { nav.popBackStack() })
                 }
                 composable(
                     Routes.ONLINE,

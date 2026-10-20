@@ -21,6 +21,8 @@ data class Track(
     val thumbnailUrl: String? = null,
     /** True for music videos / regular videos; false for YouTube Music "songs". */
     val isVideo: Boolean = false,
+    /** YouTube Music artist (channel) id when known, e.g. "UC..."; opens the artist page. */
+    val artistId: String? = null,
 )
 
 enum class MusicSource(val label: String, val shortLabel: String, val prefix: String) {
@@ -65,6 +67,14 @@ data class OnlineCollection(
     val thumbnailUrl: String?,
     val isAlbum: Boolean,
     val source: MusicSource = MusicSource.YOUTUBE,
+)
+
+/** An artist found online (YouTube Music). [id] is the channel id, "UC...". */
+@Immutable
+data class ArtistRef(
+    val id: String,
+    val name: String,
+    val thumbnailUrl: String?,
 )
 
 fun formatDuration(seconds: Long): String {

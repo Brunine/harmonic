@@ -13,6 +13,7 @@ import app.harmonic.music.data.model.source
 
 private const val EXTRA_THUMB = "harmonic.thumb"
 private const val EXTRA_VIDEO = "harmonic.video"
+private const val EXTRA_ARTIST_ID = "harmonic.artistId"
 
 /** Browse ids for Android Auto children are "<parentId>|<videoId>"; queue items are the bare id. */
 fun MediaItem.trackId(): String = mediaId.substringAfterLast('|')
@@ -60,6 +61,7 @@ fun Track.toMetadata(context: Context): MediaMetadata =
         .setExtras(Bundle().apply {
             putString(EXTRA_THUMB, thumbnailUrl)
             putBoolean(EXTRA_VIDEO, isVideo)
+            artistId?.let { putString(EXTRA_ARTIST_ID, it) }
         })
         .build()
 
@@ -72,6 +74,7 @@ fun MediaItem.toTrack(): Track {
         durationSec = m.durationMs?.let { it / 1000 } ?: -1,
         thumbnailUrl = m.extras?.getString(EXTRA_THUMB),
         isVideo = m.extras?.getBoolean(EXTRA_VIDEO) ?: false,
+        artistId = m.extras?.getString(EXTRA_ARTIST_ID),
     )
 }
 

@@ -1,5 +1,6 @@
 package app.harmonic.music.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
@@ -60,11 +62,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import app.harmonic.music.R
 import app.harmonic.music.data.model.Track
+import app.harmonic.music.data.model.MusicSource
 import app.harmonic.music.data.model.formatDuration
 import app.harmonic.music.data.model.source
 import app.harmonic.music.ui.LocalContainer
 import app.harmonic.music.ui.LocalDownloadStates
 import app.harmonic.music.ui.LocalUiActions
+import app.harmonic.music.ui.components.LyricsPanel
 import app.harmonic.music.ui.components.NeonArtwork
 import app.harmonic.music.ui.components.NeonPlayButton
 import app.harmonic.music.ui.components.NeonSeekBar
@@ -74,6 +78,7 @@ import app.harmonic.music.ui.components.SleepTimerIcon
 import app.harmonic.music.ui.components.SourceLine
 import app.harmonic.music.ui.components.TrackRow
 import app.harmonic.music.ui.components.rememberSleepRemaining
+import app.harmonic.music.ui.openArtist
 import app.harmonic.music.ui.toggleLike
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -93,6 +98,7 @@ fun PlayerScreen(onClose: () -> Unit) {
     val sleepRemaining = rememberSleepRemaining(sleepState)
     var showQueue by remember { mutableStateOf(false) }
     var showSleep by remember { mutableStateOf(false) }
+    var showLyrics by remember { mutableStateOf(false) }
     var dragPosition by remember { mutableStateOf<Float?>(null) }
 
     val current = track
@@ -121,10 +127,14 @@ fun PlayerScreen(onClose: () -> Unit) {
             }
 
             Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
-                NeonArtwork(
-                    current.thumbnailUrl,
-                    Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true),
-                )
+                if (showLyrics) {
+                    LyricsPanel(current, Modifier.fillMaxSize())
+                } else {
+                    NeonArtwork(
+                        current.thumbnailUrl,
+                        Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true),
+                    )
+                }
             }
 
             Spacer(Modifier.height(20.dp))
@@ -137,12 +147,19 @@ fun PlayerScreen(onClose: () -> Unit) {
                         overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(Modifier.height(4.dp))
+                    // Tap the artist to open their page (YouTube Music artists).
+                    val canOpenArtist = current.source != MusicSource.SOUNDCLOUD && current.artist.isNotBlank()
                     Text(
                         current.artist,
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.tertiary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = if (canOpenArtist) {
+                            Modifier.clickable { c.openArtist(current, actions, res) }
+                        } else {
+                            Modifier
+                        },
                     )
                 }
                 IconButton(onClick = { c.appScope.launch(Dispatchers.Main) { c.toggleLike(current) } }) {
@@ -232,6 +249,13 @@ fun PlayerScreen(onClose: () -> Unit) {
                 }
                 IconButton(onClick = { actions.addToPlaylist(listOf(current)) }) {
                     Icon(Icons.AutoMirrored.Filled.PlaylistAdd, stringResource(R.string.add_to_playlist))
+                }
+                IconButton(onClick = { showLyrics = !showLyrics }) {
+                    Icon(
+                        Icons.Filled.Lyrics,
+                        stringResource(R.string.lyrics),
+                        tint = if (showLyrics) MaterialTheme.colorScheme.tertiary else Color.Unspecified,
+                    )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { showSleep = true }) { SleepTimerIcon() }

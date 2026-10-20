@@ -24,6 +24,8 @@ import app.harmonic.music.data.remote.DeezerClient
 import app.harmonic.music.data.remote.NewPipeDownloader
 import app.harmonic.music.data.remote.SponsorBlockClient
 import app.harmonic.music.data.remote.Thumbnails
+import app.harmonic.music.data.remote.LyricsClient
+import app.harmonic.music.data.remote.YouTubeMusicBrowser
 import app.harmonic.music.data.remote.TrackMatcher
 import app.harmonic.music.data.remote.YouTubeRepository
 import app.harmonic.music.data.remote.YouTubeStreamInterceptor
@@ -33,6 +35,8 @@ import app.harmonic.music.data.backup.BackupManager
 import app.harmonic.music.data.prefs.SearchHistory
 import app.harmonic.music.playback.RoutingDataSource
 import app.harmonic.music.playback.SleepTimer
+import app.harmonic.music.playback.Normalizer
+import app.harmonic.music.playback.VolumeMixer
 import app.harmonic.music.playback.StreamResolver
 import app.harmonic.music.playback.trackIdFromPlaceholder
 import app.harmonic.music.ui.PlayerConnection
@@ -72,7 +76,7 @@ class AppContainer(private val app: Application) {
     val account = AccountManager(app)
 
     val db: AppDatabase = Room.databaseBuilder(app, AppDatabase::class.java, "harmonic.db")
-        .addMigrations(AppDatabase.MIGRATION_1_2)
+        .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3)
         .build()
 
     private val thumbnailPx: () -> Int = {
@@ -91,6 +95,8 @@ class AppContainer(private val app: Application) {
         )
     }
     val sponsorBlock = SponsorBlockClient(okHttp)
+    val browser by lazy { YouTubeMusicBrowser(okHttp, thumbnailPx) }
+    val lyrics by lazy { LyricsClient(okHttp, app.cacheDir) }
     private val authPlayer by lazy { AuthenticatedPlayer(okHttp, account) }
 
     private val databaseProvider by lazy { StandaloneDatabaseProvider(app) }
@@ -113,7 +119,7 @@ class AppContainer(private val app: Application) {
         StreamResolver(
             app, youtube, matcher, authPlayer, account, db.formatDao(), settings,
             { playerCache }, { downloadCache }, appScope,
-        )
+        ).also { it.loudnessListener = normalizer::onLoudnessKnown }
     }
 
     private fun resolvingFactory(forDownload: Boolean): DataSource.Factory =
@@ -169,7 +175,9 @@ class AppContainer(private val app: Application) {
 
     val jam: JamManager by lazy { JamManager(app, this) }
 
-    val sleepTimer = SleepTimer()
+    val volume = VolumeMixer()
+    val normalizer by lazy { Normalizer(db.formatDao(), settings, volume, appScope) }
+    val sleepTimer = SleepTimer(volume)
     val backup by lazy { BackupManager(app, this) }
     val searchHistory by lazy { SearchHistory(app) }
 

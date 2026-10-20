@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="about">Sobre</string>
+    <string name="about_artist">Sobre</string>
     <string name="about_desc">Cliente não oficial. O áudio vem pelo NewPipeExtractor; nenhum anúncio é carregado.</string>
     <string name="account">Conta</string>
     <string name="action_keep">Continuar tocando</string>
@@ -17,6 +18,9 @@
     <string name="app_language_desc">English ou Português (Brasil)</string>
     <string name="appearance">Aparência</string>
     <string name="applies_next_start">Vale a partir da próxima vez que o app abrir</string>
+    <string name="artist">Artista</string>
+    <string name="artist_not_found">Não foi possível encontrar este artista no YouTube Music</string>
+    <string name="artist_top_songs">Mais tocadas</string>
     <string name="audio_offload">Processamento de áudio dedicado</string>
     <string name="audio_offload_desc">Deixa o chip de áudio decodificar com a tela desligada. Desligue se ouvir falhas</string>
     <string name="audio_quality">Qualidade do áudio</string>
@@ -78,10 +82,12 @@
     <string name="err_no_stream">Nenhum áudio disponível para esta música</string>
     <string name="err_soundcloud_go">Esta faixa do SoundCloud não pode tocar (pode ser só para SoundCloud Go+)</string>
     <string name="filter_albums">Álbuns</string>
+    <string name="filter_artists">Artistas</string>
     <string name="filter_playlists">Playlists</string>
     <string name="filter_songs">Músicas</string>
     <string name="filter_tracks">Faixas</string>
     <string name="filter_videos">Vídeos</string>
+    <string name="go_to_artist">Ir para o artista</string>
     <string name="history">Histórico</string>
     <string name="home_empty">Nada por aqui ainda</string>
     <string name="home_empty_body">Busque uma música, álbum ou artista para começar. Seu histórico e recomendações aparecem aqui.</string>
@@ -139,6 +145,14 @@
     <string name="link_is_song">Esse link é de uma música, não de uma playlist</string>
     <string name="load">Carregar</string>
     <string name="load_failed">Não foi possível carregar</string>
+    <string name="lyrics">Letra</string>
+    <string name="lyrics_credit">Letras do LRCLIB</string>
+    <string name="lyrics_failed">Não foi possível carregar a letra</string>
+    <string name="lyrics_instrumental">Instrumental</string>
+    <string name="lyrics_instrumental_body">Esta música não tem letra.</string>
+    <string name="lyrics_not_found">Letra não encontrada</string>
+    <string name="lyrics_not_found_body">O LRCLIB ainda não tem a letra desta música.</string>
+    <string name="lyrics_not_synced">Esta letra não está sincronizada com a música</string>
     <string name="more">Mais</string>
     <string name="move_down">Mover para baixo</string>
     <string name="move_up">Mover para cima</string>
@@ -155,6 +169,8 @@
     <string name="no_playlists_body">Misture músicas de qualquer fonte e seus downloads, ou importe uma playlist do YouTube Music, SoundCloud, Deezer ou Apple Music.</string>
     <string name="no_results">Nenhum resultado</string>
     <string name="no_results_body">Tente outro filtro ou fonte.</string>
+    <string name="normalize_volume">Normalizar volume</string>
+    <string name="normalize_volume_desc">Abaixa músicas muito mais altas que as outras, usando os dados de volume do YouTube. Sem gastar dados a mais</string>
     <string name="nothing_playing">Nada tocando</string>
     <string name="on_mobile">Nos dados móveis</string>
     <string name="on_wifi">No Wi-Fi</string>
@@ -214,6 +230,7 @@
     <string name="restore_not_backup">Esse arquivo não é um backup do Harmonic</string>
     <string name="resume_after">Retomar depois</string>
     <string name="resume_after_desc">Volta a tocar quando a chamada, gravação ou outro som terminar</string>
+    <string name="retry">Tentar de novo</string>
     <string name="save">Salvar</string>
     <string name="save_to_library">Salvar na biblioteca</string>
     <string name="search_empty_body">Os resultados tocam só o áudio. Cada música mostra de onde vem.</string>
@@ -224,6 +241,7 @@
     <string name="search_placeholder">Músicas, álbuns, artistas, playlists</string>
     <string name="search_title_all">Buscar em todas as fontes</string>
     <string name="search_title_source">Buscar no %1$s</string>
+    <string name="see_all">Ver tudo</string>
     <string name="settings">Configurações</string>
     <string name="share">Compartilhar</string>
     <string name="shuffle">Aleatório</string>
