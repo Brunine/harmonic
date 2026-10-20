@@ -59,6 +59,7 @@ import app.harmonic.music.data.remote.SearchResult
 import app.harmonic.music.ui.LocalContainer
 import app.harmonic.music.ui.LocalUiActions
 import app.harmonic.music.ui.Routes
+import app.harmonic.music.ui.components.ArtistRow
 import app.harmonic.music.ui.components.CollectionRow
 import app.harmonic.music.ui.components.EmptyState
 import app.harmonic.music.ui.components.TrackRow
@@ -330,7 +331,16 @@ fun SearchScreen() {
                                 onMore = { actions.openTrackMenu(r.track, emptyList()) },
                             )
                             is SearchResult.Collection -> CollectionRow(r.collection) {
-                                actions.navigate(Routes.online(r.collection.url))
+                                // YouTube Music albums get the album page (track numbers, year).
+                                val albumId = r.collection.url.substringAfter("list=", "").substringBefore('&')
+                                if (r.collection.isAlbum && r.collection.source == MusicSource.YOUTUBE && albumId.isNotEmpty()) {
+                                    actions.navigate(Routes.album(albumId))
+                                } else {
+                                    actions.navigate(Routes.online(r.collection.url))
+                                }
+                            }
+                            is SearchResult.Artist -> ArtistRow(r.artist) {
+                                actions.navigate(Routes.artist(r.artist.id))
                             }
                         }
                     }

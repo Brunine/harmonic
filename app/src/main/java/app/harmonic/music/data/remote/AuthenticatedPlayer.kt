@@ -25,6 +25,11 @@ class AuthenticatedPlayer(
 ) {
     data class AudioFormat(val url: String, val itag: Int, val mimeType: String, val bitrate: Int)
 
+    /** Loudness from the last signed-in player response per video, for normalization. */
+    private val loudness = java.util.concurrent.ConcurrentHashMap<String, Float>()
+
+    fun loudnessDb(videoId: String): Float? = loudness[videoId]
+
     private data class ClientSpec(
         val name: String,
         val nameId: String,
@@ -90,6 +95,10 @@ class AuthenticatedPlayer(
         val status = json.optJSONObject("playabilityStatus")
         if (status != null && status.optString("status") != "OK") {
             throw IOException("${spec.name}: ${status.optString("status")} ${status.optString("reason")}")
+        }
+
+        json.optJSONObject("playerConfig")?.optJSONObject("audioConfig")?.let { audio ->
+            if (audio.has("loudnessDb")) loudness[videoId] = audio.optDouble("loudnessDb").toFloat()
         }
 
         val formats = json.optJSONObject("streamingData")?.optJSONArray("adaptiveFormats")

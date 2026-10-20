@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SkipNext
@@ -49,7 +50,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.harmonic.music.data.model.Track
+import app.harmonic.music.data.model.MusicSource
 import app.harmonic.music.data.model.canDownload
+import app.harmonic.music.data.model.source
 import app.harmonic.music.data.model.shareUrl
 import app.harmonic.music.ui.ExtraAction
 import app.harmonic.music.ui.LocalContainer
@@ -57,6 +60,7 @@ import app.harmonic.music.ui.LocalDownloadStates
 import app.harmonic.music.ui.LocalUiActions
 import app.harmonic.music.ui.addToPlaylist
 import app.harmonic.music.ui.createPlaylist
+import app.harmonic.music.ui.openArtist
 import app.harmonic.music.ui.toggleLike
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -126,6 +130,11 @@ fun TrackMenuSheet(track: Track, extras: List<ExtraAction>, onDismiss: () -> Uni
                         }
                     }
                 else -> Unit
+            }
+            if (track.source != MusicSource.SOUNDCLOUD && track.artist.isNotBlank()) {
+                MenuItem(stringResource(R.string.go_to_artist), Icons.Filled.Person) {
+                    act { container.openArtist(track, actions, res) }
+                }
             }
             MenuItem(stringResource(R.string.share), Icons.Filled.Share) {
                 act {

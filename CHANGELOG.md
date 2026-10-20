@@ -11,10 +11,38 @@ Every release bumps both numbers in `app/build.gradle.kts`:
 
 | Version | versionCode | Date | Status |
 |---|---|---|---|
-| 1.3.0 | 4 | 2026-10-20 | In testing |
+| 1.4.0 | 5 | 2026-10-20 | In testing |
+| 1.3.0 | 4 | 2026-10-20 | Released |
 | 1.2.0 | 3 | 2026-10-20 | Released |
 | 1.1.0 | 2 | 2026-10-20 | Released |
 | 1.0.0 | 1 | 2026-10-19 | Released |
+
+## [1.4.0] - 2026-10-20
+
+### Added
+- **Lyrics**: new lyrics button on the player. Synced lyrics scroll with the song and highlight
+  the current line; tap a line to jump there. Plain lyrics when no synced version exists. Lyrics
+  come from LRCLIB (free, no account), are only fetched when you open them, and are kept on the
+  phone afterwards.
+- **Artist pages**: header picture, top songs, albums, singles, videos, similar artists and the
+  artist's bio, straight from YouTube Music. **Shuffle** plays the artist's songs. Open one by
+  tapping the artist name on the player, from "Go to artist" in any song's menu, from the new
+  **Artists** search filter (YouTube tab), or from a shared YouTube Music artist link.
+- **Album pages**: YouTube Music albums now open as proper albums with track numbers, release
+  year, song count and length, and a link to the artist. Play, shuffle, save to library and
+  download all from the same screen. Shared album links open here too.
+- **Volume normalization** (Settings → Playback, on by default): songs mastered much louder than
+  others are turned down to YouTube's reference level, using the loudness value YouTube already
+  sends with each song (no extra data). Quiet songs are left as they are.
+
+### Changed
+- Navigation prompts, the sleep timer fade-out and normalization now share the volume control
+  without overriding each other.
+
+### Notes
+- Database version 3 (adds the loudness column). Updating from 1.3.0 keeps everything.
+- Normalization starts working for each song the next time it is streamed or downloaded;
+  songs already fully cached or downloaded before 1.4.0 play at their usual volume.
 
 ## [1.3.0] - 2026-10-20
 

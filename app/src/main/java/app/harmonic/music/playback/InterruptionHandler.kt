@@ -31,6 +31,7 @@ import app.harmonic.music.data.prefs.InterruptAction
 class InterruptionHandler(
     context: Context,
     private val player: Player,
+    private val volume: VolumeMixer,
     private val settings: () -> AppSettings,
 ) {
     enum class Situation { CALL, RECORDING, NAVIGATION, OTHER_SOUND, OTHER_MUSIC }
@@ -224,7 +225,7 @@ class InterruptionHandler(
     private fun setLowered(lower: Boolean) {
         if (lowered == lower) return
         lowered = lower
-        player.volume = if (lower) DUCK_VOLUME else 1f
+        volume.duck = if (lower) DUCK_VOLUME else 1f
     }
 
     private fun setPlayWhenReady(play: Boolean) {

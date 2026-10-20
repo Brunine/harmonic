@@ -54,6 +54,10 @@ class StreamResolver(
 ) {
     data class Resolved(val url: String, val itag: Int, val expiresAt: Long)
 
+    /** Told the loudness of every YouTube song resolved (null when YouTube gave none). */
+    @Volatile
+    var loudnessListener: ((trackId: String, loudnessDb: Float?) -> Unit)? = null
+
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
     private val resolved = ConcurrentHashMap<String, Resolved>()
     /** Matched YouTube id per Deezer / Apple Music id, so [invalidate] can clear both. */
@@ -99,11 +103,14 @@ class StreamResolver(
             null
         }
 
+        var signedIn = false
         val candidates = try {
             anonymousCandidates(youtubeId)
         } catch (e: AgeRestrictedContentException) {
+            signedIn = true
             signedInCandidates(youtubeId, e)
         } catch (e: SignInConfirmNotBotException) {
+            signedIn = true
             signedInCandidates(youtubeId, e)
         } catch (e: IOException) {
             throw e
@@ -118,7 +125,13 @@ class StreamResolver(
             runCatching { playerCache().removeResource(videoId) }
         }
 
-        formatDao.upsert(FormatEntity(videoId, chosen.itag, chosen.mimeType, chosen.bitrate))
+        val loudness = if (signedIn) {
+            authPlayer.loudnessDb(youtubeId)
+        } else {
+            runCatching { youtube.loudnessDbBlocking(youtubeId) }.getOrNull()
+        }
+        formatDao.upsert(FormatEntity(videoId, chosen.itag, chosen.mimeType, chosen.bitrate, loudness))
+        loudnessListener?.invoke(videoId, loudness)
         val result = Resolved(chosen.url, chosen.itag, expiryOf(chosen.url))
         resolved[cacheKey] = result
         return result

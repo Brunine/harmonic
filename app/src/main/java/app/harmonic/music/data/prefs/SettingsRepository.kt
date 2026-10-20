@@ -74,6 +74,8 @@ data class AppSettings(
     val onNavigation: InterruptAction = InterruptAction.LOWER,
     val onOtherMusic: InterruptAction = InterruptAction.PAUSE,
     val resumeAfterInterruption: Boolean = true,
+    /** Turn loud songs down to YouTube's reference level. */
+    val normalizeVolume: Boolean = true,
 )
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
@@ -101,6 +103,7 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         val onNavigation = stringPreferencesKey("on_navigation")
         val onOtherMusic = stringPreferencesKey("on_other_music")
         val resumeAfterInterruption = booleanPreferencesKey("resume_after_interruption")
+        val normalizeVolume = booleanPreferencesKey("normalize_volume")
     }
 
     private fun Preferences.toSettings(): AppSettings {
@@ -129,6 +132,7 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
             onNavigation = action(Keys.onNavigation, d.onNavigation),
             onOtherMusic = action(Keys.onOtherMusic, d.onOtherMusic),
             resumeAfterInterruption = this[Keys.resumeAfterInterruption] ?: d.resumeAfterInterruption,
+            normalizeVolume = this[Keys.normalizeVolume] ?: d.normalizeVolume,
         )
     }
 
@@ -185,5 +189,6 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
     suspend fun setOnNavigation(v: InterruptAction) = store.edit { it[Keys.onNavigation] = v.name }
     suspend fun setOnOtherMusic(v: InterruptAction) = store.edit { it[Keys.onOtherMusic] = v.name }
     suspend fun setResumeAfterInterruption(v: Boolean) = store.edit { it[Keys.resumeAfterInterruption] = v }
+    suspend fun setNormalizeVolume(v: Boolean) = store.edit { it[Keys.normalizeVolume] = v }
     suspend fun setJamName(v: String) = store.edit { it[Keys.jamName] = v.trim().take(30) }
 }

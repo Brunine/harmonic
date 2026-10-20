@@ -26,6 +26,9 @@ Inspired by InnerTune, OuterTune and YMusic.
   sounds, navigation prompts and other music apps.
 - **Everyday comfort**: sleep timer (minutes or end of song, with fade-out), search history,
   drag-to-reorder for playlists and the queue, and backup & restore of the library to a file.
+- **Discover**: artist pages (top songs, albums, singles, similar artists), album pages with track
+  numbers and year, and synced lyrics from LRCLIB that follow the song.
+- **Volume normalization**: loud songs are turned down to YouTube's reference level.
 - **Languages**: English and Português (Brasil); per-app language picker on Android 13+.
 - **Crash reports** saved on the phone and shareable from Settings.
 - **Themes**: light / dark / system, preset palettes, wallpaper colours (Android 12+), colours

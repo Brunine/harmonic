@@ -2,6 +2,7 @@ package app.harmonic.music.data.remote
 
 import android.net.Uri
 import android.util.LruCache
+import app.harmonic.music.data.model.ArtistRef
 import app.harmonic.music.data.model.MusicSource
 import app.harmonic.music.data.model.OnlineCollection
 import app.harmonic.music.data.model.Track
@@ -13,9 +14,11 @@ import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.Page
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.StreamingService
+import org.schabi.newpipe.extractor.channel.ChannelInfoItem
 import org.schabi.newpipe.extractor.playlist.PlaylistInfo
 import org.schabi.newpipe.extractor.playlist.PlaylistInfoItem
 import org.schabi.newpipe.extractor.search.SearchInfo
+import org.schabi.newpipe.extractor.stream.StreamExtractor
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import org.schabi.newpipe.extractor.stream.StreamType
@@ -23,6 +26,7 @@ import org.schabi.newpipe.extractor.stream.StreamType
 sealed interface SearchResult {
     data class Song(val track: Track) : SearchResult
     data class Collection(val collection: OnlineCollection) : SearchResult
+    data class Artist(val artist: ArtistRef) : SearchResult
 }
 
 /** [next] is an opaque continuation token (a NewPipe Page, a Deezer index...), null at the end. */
@@ -45,7 +49,7 @@ class YouTubeRepository(private val thumbnailPx: () -> Int) {
     private val youtube = ServiceList.YouTube
     private val soundcloud = ServiceList.SoundCloud
 
-    private class CachedInfo(val info: StreamInfo, val fetchedAt: Long)
+    private class CachedInfo(val info: StreamInfo, val loudnessDb: Float?, val fetchedAt: Long)
 
     // Stream URLs live ~6 hours; keep extracted info for 30 minutes so skipping back and forth,
     // related-track lookups and prefetches never repeat the extraction requests.
@@ -109,13 +113,36 @@ class YouTubeRepository(private val thumbnailPx: () -> Int) {
     // ---------------------------------------------------------------------------------------
 
     /** Blocking; called from player loader threads. Works for YouTube ids and "sc:" ids. */
-    fun streamInfoBlocking(id: String): StreamInfo {
+    fun streamInfoBlocking(id: String): StreamInfo = cachedInfo(id).info
+
+    /**
+     * YouTube's loudness for [id] in dB above its reference level (positive = louder), read
+     * from the response the stream info already came with, so it costs no extra data.
+     * Null when unknown (SoundCloud, or YouTube did not send it).
+     */
+    fun loudnessDbBlocking(id: String): Float? = cachedInfo(id).loudnessDb
+
+    private fun cachedInfo(id: String): CachedInfo {
         val now = System.currentTimeMillis()
-        streamCache.get(id)?.let { if (now - it.fetchedAt < STREAM_INFO_TTL) return it.info }
-        val info = StreamInfo.getInfo(serviceFor(id), urlFor(id))
-        streamCache.put(id, CachedInfo(info, now))
-        return info
+        streamCache.get(id)?.let { if (now - it.fetchedAt < STREAM_INFO_TTL) return it }
+        val extractor = serviceFor(id).getStreamExtractor(urlFor(id))
+        val info = StreamInfo.getInfo(extractor)
+        val cached = CachedInfo(info, loudnessOf(extractor), now)
+        streamCache.put(id, cached)
+        return cached
     }
+
+    /**
+     * NewPipeExtractor keeps YouTube's player response private; the loudness value sits in
+     * playerConfig.audioConfig.loudnessDb. Read it by reflection and give up quietly if the
+     * extractor's internals ever change (normalization is then simply skipped).
+     */
+    private fun loudnessOf(extractor: StreamExtractor): Float? = runCatching {
+        val field = extractor.javaClass.getDeclaredField("playerResponse").apply { isAccessible = true }
+        val response = field.get(extractor) as? Map<*, *> ?: return@runCatching null
+        val audio = (response["playerConfig"] as? Map<*, *>)?.get("audioConfig") as? Map<*, *>
+        (audio?.get("loudnessDb") as? Number)?.toFloat()
+    }.getOrNull()
 
     fun invalidate(id: String) {
         streamCache.remove(id)
@@ -130,6 +157,7 @@ class YouTubeRepository(private val thumbnailPx: () -> Int) {
             durationSec = info.duration,
             thumbnailUrl = Thumbnails.pick(info.thumbnails, if (id.startsWith("sc:")) null else id, thumbnailPx()),
             isVideo = !id.startsWith("sc:"),
+            artistId = if (id.startsWith("sc:")) null else channelId(info.uploaderUrl),
         )
     }
 
@@ -171,8 +199,17 @@ class YouTubeRepository(private val thumbnailPx: () -> Int) {
 
     private fun validPage(page: Page?): Page? = page?.takeIf { Page.isValid(it) }
 
+    /** YouTube Music artists matching [name], best match first. */
+    fun searchArtistsBlocking(name: String): List<ArtistRef> =
+        searchBlocking(MusicSource.YOUTUBE, name, "music_artists", null).items
+            .filterIsInstance<SearchResult.Artist>()
+            .map { it.artist }
+
     private fun toResult(item: InfoItem, isVideo: Boolean, isAlbum: Boolean): SearchResult? = when (item) {
         is StreamInfoItem -> toTrack(item, isVideo)?.let { SearchResult.Song(it) }
+        is ChannelInfoItem -> channelId(item.url)?.let { id ->
+            SearchResult.Artist(ArtistRef(id, item.name, Thumbnails.pick(item.thumbnails, null, thumbnailPx())))
+        }
         is PlaylistInfoItem -> SearchResult.Collection(
             OnlineCollection(
                 url = item.url,
@@ -206,10 +243,15 @@ class YouTubeRepository(private val thumbnailPx: () -> Int) {
             durationSec = item.duration,
             thumbnailUrl = Thumbnails.pick(item.thumbnails, id, thumbnailPx()),
             isVideo = isVideo,
+            artistId = runCatching { item.uploaderUrl }.getOrNull()?.let { channelId(it) },
         )
     }
 
-    private companion object {
-        const val STREAM_INFO_TTL = 30 * 60 * 1000L
+    companion object {
+        private const val STREAM_INFO_TTL = 30 * 60 * 1000L
+        private val CHANNEL_ID = Regex("/channel/(UC[\\w-]{22})")
+
+        /** "UC..." from a channel URL, or null. YouTube Music artist ids are channel ids. */
+        fun channelId(url: String?): String? = url?.let { CHANNEL_ID.find(it)?.groupValues?.get(1) }
     }
 }

@@ -76,6 +76,8 @@ data class FormatEntity(
     val itag: Int,
     val mimeType: String?,
     val bitrate: Int,
+    /** YouTube's loudness for the song (dB above reference), for volume normalization. */
+    val loudnessDb: Float? = null,
 )
 
 /** Which YouTube video plays a Deezer / Apple Music track. */

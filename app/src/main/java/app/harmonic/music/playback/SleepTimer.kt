@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
  * so it never cuts off abruptly. Lives in the app container; the playback service attaches its
  * player while it runs.
  */
-class SleepTimer {
+class SleepTimer(private val volume: VolumeMixer) {
     sealed interface State {
         data object Off : State
         /** [endsAt] is in [SystemClock.elapsedRealtime] milliseconds. */
@@ -75,20 +75,20 @@ class SleepTimer {
     fun cancel() {
         job?.cancel()
         job = null
+        volume.fade = 1f
         player?.pauseAtEndOfMediaItems = false
         _state.value = State.Off
     }
 
     private suspend fun fadeOutAndPause() {
         val p = player ?: return
-        val start = p.volume
         val steps = 20
         for (i in 1..steps) {
-            p.volume = start * (1f - i.toFloat() / steps)
+            volume.fade = 1f - i.toFloat() / steps
             delay(FADE_MS / steps)
         }
         p.pause()
-        p.volume = start
+        volume.fade = 1f
     }
 
     private companion object {

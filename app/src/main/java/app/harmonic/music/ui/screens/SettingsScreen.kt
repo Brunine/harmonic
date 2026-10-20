@@ -216,6 +216,9 @@ fun SettingsScreen(onBack: () -> Unit) {
             SwitchRow(stringResource(R.string.sponsorblock), stringResource(R.string.sponsorblock_desc), s.sponsorBlock) {
                 runAsync { c.settings.setSponsorBlock(it) }
             }
+            SwitchRow(stringResource(R.string.normalize_volume), stringResource(R.string.normalize_volume_desc), s.normalizeVolume) {
+                runAsync { c.settings.setNormalizeVolume(it) }
+            }
 
             Header(R.string.interruptions)
             InterruptTarget.entries.forEach { target ->

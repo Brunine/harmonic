@@ -98,7 +98,8 @@ class PlaybackService : MediaLibraryService() {
             .setSeekForwardIncrementMs(10_000)
             .build()
         player.addListener(listener)
-        interruptions = InterruptionHandler(this, player) { app.settings.current }.also { it.start() }
+        app.volume.attach(player)
+        interruptions = InterruptionHandler(this, player, app.volume) { app.settings.current }.also { it.start() }
         app.sleepTimer.attach(player)
         applyTrackParameters(app.settings.current.audioOffload)
 
@@ -134,6 +135,7 @@ class PlaybackService : MediaLibraryService() {
         session.release()
         interruptions.release()
         app.sleepTimer.detach()
+        app.volume.detach()
         player.removeListener(listener)
         player.release()
         super.onDestroy()
@@ -184,6 +186,7 @@ class PlaybackService : MediaLibraryService() {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             mediaItem ?: return
             val id = mediaItem.trackId()
+            app.normalizer.onTrackChanged(id)
             retriedId = null
             recordPlay(mediaItem)
             scheduleSponsorBlock(mediaItem)

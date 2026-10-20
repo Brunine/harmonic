@@ -34,6 +34,7 @@ class CatalogRepository(
             CatalogFilter(R.string.filter_videos, "music_videos"),
             CatalogFilter(R.string.filter_albums, "music_albums"),
             CatalogFilter(R.string.filter_playlists, "music_playlists"),
+            CatalogFilter(R.string.filter_artists, "music_artists"),
         )
         MusicSource.SOUNDCLOUD -> listOf(
             CatalogFilter(R.string.filter_tracks, "tracks"),
@@ -134,6 +135,10 @@ class CatalogRepository(
     sealed interface LinkTarget {
         data class Song(val track: Track) : LinkTarget
         data class Collection(val url: String) : LinkTarget
+        /** A YouTube Music artist page; [id] is the channel id. */
+        data class Artist(val id: String) : LinkTarget
+        /** A YouTube Music album page ("MPREb_..." browse id). */
+        data class Album(val id: String) : LinkTarget
     }
 
     /** Understands YouTube, YouTube Music, SoundCloud, Deezer and Apple Music links. */
@@ -154,10 +159,43 @@ class CatalogRepository(
                 LinkTarget.Collection("https://music.apple.com/album/$id")
             }
         }
+        youtubeMusicBrowseTarget(url)?.let { return@withContext it }
         youtube.soundCloudIdFromUrl(url)?.let { return@withContext LinkTarget.Song(youtube.track(it)) }
         youtube.videoIdFromUrl(url)?.let { return@withContext LinkTarget.Song(youtube.track(it)) }
         if (youtube.isPlaylistUrl(url)) return@withContext LinkTarget.Collection(url)
         null
+    }
+
+    /** music.youtube.com/browse/MPREb_... and youtube.com/channel/UC... links. */
+    private fun youtubeMusicBrowseTarget(url: String): LinkTarget? {
+        val uri = android.net.Uri.parse(url)
+        val host = uri.host ?: return null
+        if (!host.endsWith("youtube.com")) return null
+        val segments = uri.pathSegments
+        return when {
+            segments.size >= 2 && segments[0] == "browse" && segments[1].startsWith("MPRE") ->
+                LinkTarget.Album(segments[1])
+            segments.size >= 2 && segments[0] == "channel" && segments[1].startsWith("UC") ->
+                LinkTarget.Artist(segments[1])
+            else -> null
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Artists
+    // ---------------------------------------------------------------------------------------
+
+    /**
+     * The YouTube Music artist id for a song: the one it came with, or the best artist search
+     * match for its artist name (an exact name match wins). Null when nothing fits.
+     */
+    suspend fun artistIdFor(track: Track): String? {
+        track.artistId?.let { return it }
+        val name = track.artist.substringBefore(",").substringBefore(" & ").substringBefore(" feat").trim()
+        if (name.isEmpty()) return null
+        val found = withContext(Dispatchers.IO) { runCatching { youtube.searchArtistsBlocking(name) }.getOrNull() }
+            ?: return null
+        return (found.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: found.firstOrNull())?.id
     }
 
     private fun expandRedirect(url: String): String = runCatching {

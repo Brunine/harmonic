@@ -40,3 +40,9 @@
 # The extractor pulls in several JVM-only optional dependencies. Missing optional classes
 # must not fail the release build.
 -ignorewarnings
+
+## Volume normalization reads YouTube's loudness from the extractor's player response
+## (YouTubeRepository.loudnessOf) by reflection.
+-keepclassmembers class org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor {
+    private ** playerResponse;
+}

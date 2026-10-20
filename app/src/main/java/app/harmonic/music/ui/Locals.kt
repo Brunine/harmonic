@@ -32,7 +32,11 @@ object Routes {
     const val LOGIN = "login"
     const val PLAYLIST = "playlist/{id}"
     const val ONLINE = "online?url={url}"
+    const val ARTIST = "artist/{id}"
+    const val ALBUM = "album/{id}"
 
     fun playlist(id: Long) = "playlist/$id"
     fun online(url: String) = "online?url=${Uri.encode(url)}"
+    fun artist(id: String) = "artist/${Uri.encode(id)}"
+    fun album(id: String) = "album/${Uri.encode(id)}"
 }
