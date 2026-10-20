@@ -13,6 +13,7 @@ class HarmonicApp : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        CrashLog.install(this)
         container = AppContainer(this)
         container.init()
         // Create the download manager on the main thread so it can resume pending downloads.

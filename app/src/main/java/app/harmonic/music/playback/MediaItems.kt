@@ -50,7 +50,8 @@ fun Track.toMetadata(context: Context): MediaMetadata =
         .setTitle(title)
         .setArtist(artist)
         .setDisplayTitle(title)
-        .setSubtitle(artist)
+        // Shown under the title in Android Auto and the notification: say where the song comes from.
+        .setSubtitle(if (artist.isEmpty()) source.label else "$artist · ${source.shortLabel}")
         .setArtworkUri(ArtworkProvider.uriFor(context, thumbnailUrl))
         .setDurationMs(if (durationSec > 0) durationSec * 1000 else null)
         .setIsPlayable(true)

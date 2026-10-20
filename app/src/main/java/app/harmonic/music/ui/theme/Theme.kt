@@ -18,7 +18,7 @@ import androidx.core.graphics.ColorUtils
 import app.harmonic.music.data.prefs.ThemeMode
 import app.harmonic.music.data.prefs.ThemePalette
 
-private val DEFAULT_SEED: Int = 0xFFFF6B4A.toInt()
+private val DEFAULT_SEED: Int = 0xFFFF2E97.toInt()
 
 @Composable
 fun isDarkTheme(mode: ThemeMode): Boolean = when (mode) {
@@ -43,6 +43,7 @@ fun HarmonicTheme(
     val black = pureBlack && dark
 
     val scheme = when (palette) {
+        ThemePalette.SYNTHWAVE -> synthwaveScheme(dark, black)
         ThemePalette.WALLPAPER ->
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val s = if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -56,7 +57,81 @@ fun HarmonicTheme(
 
     // Album colours change with every song: fade the key colours instead of flashing.
     val animated = if (palette == ThemePalette.ALBUM) scheme.animated() else scheme
-    MaterialTheme(colorScheme = animated, content = content)
+    MaterialTheme(colorScheme = animated, typography = HarmonicTypography, content = content)
+}
+
+/**
+ * Harmonic's own look: neon pink and cyan on a deep purple night sky.
+ * The neon gradient used across the app runs from [ColorScheme.primary] to [ColorScheme.tertiary].
+ */
+fun synthwaveScheme(dark: Boolean, pureBlack: Boolean): ColorScheme {
+    val pink = Color(0xFFFF2E97)
+    val cyan = Color(0xFF2DE2E6)
+    val violet = Color(0xFFB967FF)
+    return if (dark) {
+        val sky = if (pureBlack) Color.Black else Color(0xFF0D0221)
+        darkColorScheme(
+            primary = pink,
+            onPrimary = Color(0xFF2A0016),
+            primaryContainer = Color(0xFF5C0F3D),
+            onPrimaryContainer = Color(0xFFFFD6EA),
+            secondary = violet,
+            onSecondary = Color(0xFF22053F),
+            secondaryContainer = Color(0xFF3A1766),
+            onSecondaryContainer = Color(0xFFF0DBFF),
+            tertiary = cyan,
+            onTertiary = Color(0xFF00363A),
+            tertiaryContainer = Color(0xFF0B4A55),
+            onTertiaryContainer = Color(0xFFB8FBFF),
+            background = sky,
+            onBackground = Color(0xFFF5E9FF),
+            surface = sky,
+            onSurface = Color(0xFFF5E9FF),
+            surfaceVariant = Color(0xFF2A1450),
+            onSurfaceVariant = Color(0xFFC9B6E8),
+            surfaceTint = pink,
+            inverseSurface = Color(0xFFF5E9FF),
+            inverseOnSurface = Color(0xFF1A0838),
+            inversePrimary = Color(0xFFB0005E),
+            outline = Color(0xFF8A6BB8),
+            outlineVariant = Color(0xFF3B2266),
+            surfaceBright = Color(0xFF2B1452),
+            surfaceDim = sky,
+            surfaceContainerLowest = if (pureBlack) Color.Black else Color(0xFF080114),
+            surfaceContainerLow = if (pureBlack) Color(0xFF07020F) else Color(0xFF12042B),
+            surfaceContainer = if (pureBlack) Color(0xFF0D0420) else Color(0xFF170736),
+            surfaceContainerHigh = if (pureBlack) Color(0xFF150830) else Color(0xFF1E0B44),
+            surfaceContainerHighest = if (pureBlack) Color(0xFF1C0C3D) else Color(0xFF261052),
+        )
+    } else {
+        lightColorScheme(
+            primary = Color(0xFFC4006E),
+            onPrimary = Color.White,
+            primaryContainer = Color(0xFFFFD6EA),
+            onPrimaryContainer = Color(0xFF3E0022),
+            secondary = Color(0xFF7A2EC2),
+            onSecondary = Color.White,
+            secondaryContainer = Color(0xFFF0DBFF),
+            onSecondaryContainer = Color(0xFF2A0052),
+            tertiary = Color(0xFF00838A),
+            onTertiary = Color.White,
+            tertiaryContainer = Color(0xFFB8FBFF),
+            onTertiaryContainer = Color(0xFF002022),
+            background = Color(0xFFFFF7FC),
+            onBackground = Color(0xFF1E1030),
+            surface = Color(0xFFFFF7FC),
+            onSurface = Color(0xFF1E1030),
+            surfaceVariant = Color(0xFFF1E3F7),
+            onSurfaceVariant = Color(0xFF52416A),
+            outline = Color(0xFF85739C),
+            outlineVariant = Color(0xFFD8C8E4),
+            surfaceContainerLowest = Color.White,
+            surfaceContainerLow = Color(0xFFFCF0F8),
+            surfaceContainer = Color(0xFFF8EAF4),
+            surfaceContainerHigh = Color(0xFFF3E3EF),
+            surfaceContainerHighest = Color(0xFFEEDCEA),
+        )
+    }
 }
 
 @Composable

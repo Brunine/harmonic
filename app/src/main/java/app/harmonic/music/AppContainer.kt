@@ -29,7 +29,10 @@ import app.harmonic.music.data.remote.YouTubeRepository
 import app.harmonic.music.data.remote.YouTubeStreamInterceptor
 import app.harmonic.music.download.DownloadUtil
 import app.harmonic.music.jam.JamManager
+import app.harmonic.music.data.backup.BackupManager
+import app.harmonic.music.data.prefs.SearchHistory
 import app.harmonic.music.playback.RoutingDataSource
+import app.harmonic.music.playback.SleepTimer
 import app.harmonic.music.playback.StreamResolver
 import app.harmonic.music.playback.trackIdFromPlaceholder
 import app.harmonic.music.ui.PlayerConnection
@@ -165,6 +168,10 @@ class AppContainer(private val app: Application) {
     val playerConnection by lazy { PlayerConnection(app) { jam } }
 
     val jam: JamManager by lazy { JamManager(app, this) }
+
+    val sleepTimer = SleepTimer()
+    val backup by lazy { BackupManager(app, this) }
+    val searchHistory by lazy { SearchHistory(app) }
 
     fun init() {
         val locale = Locale.getDefault()

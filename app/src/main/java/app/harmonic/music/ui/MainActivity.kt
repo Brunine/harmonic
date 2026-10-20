@@ -1,5 +1,8 @@
 package app.harmonic.music.ui
 
+import app.harmonic.music.R
+import androidx.compose.ui.res.stringResource
+import androidx.annotation.StringRes
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -22,6 +25,14 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.unit.dp
+import app.harmonic.music.ui.components.neonBrush
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -130,18 +141,19 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private data class BottomTab(val route: String, val label: String, val icon: ImageVector)
+private data class BottomTab(val route: String, @StringRes val label: Int, val icon: ImageVector)
 
 private val bottomTabs = listOf(
-    BottomTab(Routes.HOME, "Home", Icons.Filled.Home),
-    BottomTab(Routes.SEARCH, "Search", Icons.Filled.Search),
-    BottomTab(Routes.LIBRARY, "Library", Icons.Filled.LibraryMusic),
-    BottomTab(Routes.JAM, "Jam", Icons.Filled.Groups),
+    BottomTab(Routes.HOME, R.string.tab_home, Icons.Filled.Home),
+    BottomTab(Routes.SEARCH, R.string.tab_search, Icons.Filled.Search),
+    BottomTab(Routes.LIBRARY, R.string.tab_library, Icons.Filled.LibraryMusic),
+    BottomTab(Routes.JAM, R.string.tab_jam, Icons.Filled.Groups),
 )
 
 @Composable
 fun HarmonicRoot(container: AppContainer, sharedText: MutableStateFlow<String?>) {
     val nav = rememberNavController()
+    val res = LocalContext.current.resources
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val downloads by container.downloads.states.collectAsStateWithLifecycle()
@@ -182,10 +194,10 @@ fun HarmonicRoot(container: AppContainer, sharedText: MutableStateFlow<String?>)
                         if (!container.jam.isGuest) nav.navigate(Routes.PLAYER) { launchSingleTop = true }
                     }
                     is CatalogRepository.LinkTarget.Collection -> nav.navigate(Routes.online(target.url))
-                    null -> actions.showMessage("Unsupported link")
+                    null -> actions.showMessage(res.getString(R.string.unsupported_link))
                 }
             }
-            .onFailure { actions.showMessage("Couldn't open link: ${it.message}") }
+            .onFailure { actions.showMessage(res.getString(R.string.open_link_failed)) }
     }
 
     CompositionLocalProvider(
@@ -206,7 +218,8 @@ fun HarmonicRoot(container: AppContainer, sharedText: MutableStateFlow<String?>)
                 if (showChrome) {
                     Column {
                         MiniPlayer(onOpen = { nav.navigate(Routes.PLAYER) { launchSingleTop = true } })
-                        NavigationBar {
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(neonBrush()))
+                        NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
                             bottomTabs.forEach { tab ->
                                 NavigationBarItem(
                                     selected = backStack?.destination?.route == tab.route,
@@ -224,7 +237,12 @@ fun HarmonicRoot(container: AppContainer, sharedText: MutableStateFlow<String?>)
                                             Icon(tab.icon, null)
                                         }
                                     },
-                                    label = { Text(tab.label) },
+                                    label = { Text(stringResource(tab.label).uppercase(), style = MaterialTheme.typography.labelSmall) },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = MaterialTheme.colorScheme.tertiary,
+                                        selectedTextColor = MaterialTheme.colorScheme.tertiary,
+                                        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                                    ),
                                 )
                             }
                         }

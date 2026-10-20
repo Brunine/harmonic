@@ -1,5 +1,8 @@
 package app.harmonic.music.ui.components
 
+import app.harmonic.music.R
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -64,6 +67,7 @@ fun TrackMenuSheet(track: Track, extras: List<ExtraAction>, onDismiss: () -> Uni
     val actions = LocalUiActions.current
     val connection = container.playerConnection
     val context = LocalContext.current
+    val res = context.resources
     val song by remember(track.id) { container.db.songDao().observe(track.id) }.collectAsState(null)
     val download = LocalDownloadStates.current[track.id]
     val inJam = container.jam.isGuest
@@ -85,14 +89,14 @@ fun TrackMenuSheet(track: Track, extras: List<ExtraAction>, onDismiss: () -> Uni
                 onDismiss()
             }
 
-            MenuItem(if (inJam) "Play next in the Jam" else "Play next", Icons.Filled.SkipNext) {
+            MenuItem(stringResource(if (inJam) R.string.play_next_jam else R.string.play_next), Icons.Filled.SkipNext) {
                 act { connection.playNext(listOf(track)) }
             }
-            MenuItem(if (inJam) "Add to the Jam" else "Add to queue", Icons.AutoMirrored.Filled.QueueMusic) {
+            MenuItem(stringResource(if (inJam) R.string.add_to_jam else R.string.add_to_queue), Icons.AutoMirrored.Filled.QueueMusic) {
                 act { connection.addToQueue(listOf(track)) }
             }
             if (!inJam) {
-                MenuItem("Start radio", Icons.Filled.Radio) {
+                MenuItem(stringResource(R.string.start_radio), Icons.Filled.Radio) {
                     act {
                         container.appScope.launch(Dispatchers.Main) {
                             val related = runCatching { container.catalog.related(track) }.getOrDefault(emptyList())
@@ -101,29 +105,29 @@ fun TrackMenuSheet(track: Track, extras: List<ExtraAction>, onDismiss: () -> Uni
                     }
                 }
             }
-            MenuItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd) { act { actions.addToPlaylist(listOf(track)) } }
+            MenuItem(stringResource(R.string.add_to_playlist), Icons.AutoMirrored.Filled.PlaylistAdd) { act { actions.addToPlaylist(listOf(track)) } }
             val liked = song?.liked == true
             MenuItem(
-                if (liked) "Remove from liked" else "Like",
+                stringResource(if (liked) R.string.unlike else R.string.like),
                 if (liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
             ) { act { container.appScope.launch(Dispatchers.Main) { container.toggleLike(track) } } }
             when {
                 download?.isDone == true ->
-                    MenuItem("Remove download", Icons.Filled.Delete) { act { container.downloads.remove(track.id) } }
+                    MenuItem(stringResource(R.string.remove_download), Icons.Filled.Delete) { act { container.downloads.remove(track.id) } }
                 download?.isActive == true ->
-                    MenuItem("Cancel download (${download.percent.toInt()}%)", Icons.Filled.Delete) {
+                    MenuItem(stringResource(R.string.cancel_download, download.percent.toInt()), Icons.Filled.Delete) {
                         act { container.downloads.remove(track.id) }
                     }
                 track.canDownload ->
-                    MenuItem("Download", Icons.Filled.Download) {
+                    MenuItem(stringResource(R.string.download), Icons.Filled.Download) {
                         act {
                             container.downloads.download(listOf(track))
-                            actions.showMessage("Downloading “${track.title}”")
+                            actions.showMessage(res.getString(R.string.downloading_title, track.title))
                         }
                     }
                 else -> Unit
             }
-            MenuItem("Share", Icons.Filled.Share) {
+            MenuItem(stringResource(R.string.share), Icons.Filled.Share) {
                 act {
                     val send = Intent(Intent.ACTION_SEND)
                         .setType("text/plain")
@@ -150,19 +154,20 @@ private fun MenuItem(label: String, icon: ImageVector, onClick: () -> Unit) {
 fun AddToPlaylistDialog(tracks: List<Track>, onDismiss: () -> Unit) {
     val container = LocalContainer.current
     val actions = LocalUiActions.current
+    val res = LocalContext.current.resources
     val playlists by remember { container.db.playlistDao().summaries() }.collectAsState(emptyList())
     var creating by remember { mutableStateOf(false) }
 
     if (creating) {
         TextInputDialog(
-            title = "New playlist",
-            label = "Name",
-            confirm = "Create",
+            title = stringResource(R.string.new_playlist),
+            label = stringResource(R.string.name),
+            confirm = stringResource(R.string.create),
             onDismiss = { creating = false },
             onConfirm = { name ->
                 container.appScope.launch(Dispatchers.Main) {
                     container.createPlaylist(name, tracks)
-                    actions.showMessage("Added to $name")
+                    actions.showMessage(res.getString(R.string.added_to, name))
                 }
                 onDismiss()
             },
@@ -172,12 +177,12 @@ fun AddToPlaylistDialog(tracks: List<Track>, onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (tracks.size == 1) "Add to playlist" else "Add ${tracks.size} songs to playlist") },
+        title = { Text(pluralStringResource(R.plurals.add_songs_to_playlist, tracks.size, tracks.size)) },
         text = {
             LazyColumn(Modifier.heightIn(max = 360.dp)) {
                 item {
                     ListItem(
-                        headlineContent = { Text("New playlist") },
+                        headlineContent = { Text(stringResource(R.string.new_playlist)) },
                         leadingContent = { Icon(Icons.Filled.Add, null) },
                         modifier = Modifier.fillMaxWidth().clickable { creating = true },
                     )
@@ -185,12 +190,12 @@ fun AddToPlaylistDialog(tracks: List<Track>, onDismiss: () -> Unit) {
                 items(playlists, key = { it.playlist.id }) { p ->
                     ListItem(
                         headlineContent = { Text(p.playlist.name) },
-                        supportingContent = { Text("${p.songCount} songs") },
+                        supportingContent = { Text(pluralStringResource(R.plurals.songs_count, p.songCount, p.songCount)) },
                         leadingContent = { Artwork(p.thumbnailUrl, Modifier.size(40.dp)) },
                         modifier = Modifier.fillMaxWidth().clickable {
                             container.appScope.launch(Dispatchers.Main) {
                                 container.addToPlaylist(p.playlist.id, tracks)
-                                actions.showMessage("Added to ${p.playlist.name}")
+                                actions.showMessage(res.getString(R.string.added_to, p.playlist.name))
                             }
                             onDismiss()
                         },
@@ -199,6 +204,6 @@ fun AddToPlaylistDialog(tracks: List<Track>, onDismiss: () -> Unit) {
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }

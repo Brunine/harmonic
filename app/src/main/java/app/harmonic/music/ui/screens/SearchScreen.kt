@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.History
@@ -31,6 +32,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -40,7 +42,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -48,6 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.harmonic.music.AppContainer
+import app.harmonic.music.R
 import app.harmonic.music.data.model.MusicSource
 import app.harmonic.music.data.remote.CatalogFilter
 import app.harmonic.music.data.remote.SearchResult
@@ -57,17 +62,21 @@ import app.harmonic.music.ui.Routes
 import app.harmonic.music.ui.components.CollectionRow
 import app.harmonic.music.ui.components.EmptyState
 import app.harmonic.music.ui.components.TrackRow
+import app.harmonic.music.ui.components.color
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
+private val ALL_FILTER = CatalogFilter(R.string.filter_songs, "all")
+
 class SearchViewModel(private val c: AppContainer) : ViewModel() {
     var query by mutableStateOf("")
         private set
-    var source by mutableStateOf(MusicSource.YOUTUBE)
+    /** null = all sources at once. */
+    var source by mutableStateOf<MusicSource?>(null)
         private set
-    var filter by mutableStateOf(c.catalog.filters(MusicSource.YOUTUBE).first())
+    var filter by mutableStateOf(ALL_FILTER)
         private set
     var submitted by mutableStateOf<String?>(null)
         private set
@@ -75,19 +84,23 @@ class SearchViewModel(private val c: AppContainer) : ViewModel() {
     val suggestions = MutableStateFlow<List<String>>(emptyList())
     val results = MutableStateFlow<List<SearchResult>>(emptyList())
     val loading = MutableStateFlow(false)
+    /** Error text from the service, or "" when the reason is unknown. */
     val error = MutableStateFlow<String?>(null)
 
     private var next: Any? = null
     private var suggestJob: Job? = null
     private var searchJob: Job? = null
 
-    fun filters(): List<CatalogFilter> = c.catalog.filters(source)
+    fun filters(): List<CatalogFilter> = source?.let { c.catalog.filters(it) } ?: listOf(ALL_FILTER)
 
     fun onQueryChange(q: String) {
         query = q
         suggestJob?.cancel()
         if (q.isBlank()) {
             suggestions.value = emptyList()
+            submitted = null
+            results.value = emptyList()
+            error.value = null
             return
         }
         suggestJob = viewModelScope.launch {
@@ -101,6 +114,7 @@ class SearchViewModel(private val c: AppContainer) : ViewModel() {
         if (text.isEmpty()) return
         query = text
         submitted = text
+        c.searchHistory.add(text)
         suggestJob?.cancel()
         suggestions.value = emptyList()
         searchJob?.cancel()
@@ -111,20 +125,20 @@ class SearchViewModel(private val c: AppContainer) : ViewModel() {
         val f = filter
         searchJob = viewModelScope.launch {
             loading.value = true
-            runCatching { c.catalog.search(src, f, text) }
+            runCatching { if (src == null) c.catalog.searchAll(text) else c.catalog.search(src, f, text) }
                 .onSuccess {
                     results.value = it.items
                     next = it.next
                 }
-                .onFailure { error.value = it.message ?: "Search failed" }
+                .onFailure { error.value = it.message.orEmpty() }
             loading.value = false
         }
     }
 
-    fun selectSource(s: MusicSource) {
+    fun selectSource(s: MusicSource?) {
         if (s == source) return
         source = s
-        filter = c.catalog.filters(s).first()
+        filter = s?.let { c.catalog.filters(it).first() } ?: ALL_FILTER
         submitted?.let { search(it) }
     }
 
@@ -138,7 +152,7 @@ class SearchViewModel(private val c: AppContainer) : ViewModel() {
         val token = next ?: return
         val text = submitted ?: return
         if (loading.value) return
-        val src = source
+        val src = source ?: return
         val f = filter
         searchJob = viewModelScope.launch {
             loading.value = true
@@ -161,6 +175,7 @@ fun SearchScreen() {
     val results by vm.results.collectAsStateWithLifecycle()
     val loading by vm.loading.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
+    val history by c.searchHistory.items.collectAsStateWithLifecycle()
     val focus = LocalFocusManager.current
     val listState = rememberLazyListState()
     val connection = c.playerConnection
@@ -178,11 +193,13 @@ fun SearchScreen() {
             value = vm.query,
             onValueChange = vm::onQueryChange,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            placeholder = { Text("Songs, albums, artists, playlists") },
+            placeholder = { Text(stringResource(R.string.search_placeholder)) },
             leadingIcon = { Icon(Icons.Filled.Search, null) },
             trailingIcon = {
                 if (vm.query.isNotEmpty()) {
-                    IconButton(onClick = { vm.onQueryChange("") }) { Icon(Icons.Filled.Close, "Clear") }
+                    IconButton(onClick = { vm.onQueryChange("") }) {
+                        Icon(Icons.Filled.Close, stringResource(R.string.clear))
+                    }
                 }
             },
             singleLine = true,
@@ -194,9 +211,19 @@ fun SearchScreen() {
         )
 
         // Where results come from
-        SecondaryScrollableTabRow(selectedTabIndex = vm.source.ordinal, edgePadding = 16.dp) {
-            MusicSource.entries.forEach { s ->
-                Tab(selected = vm.source == s, onClick = { vm.selectSource(s) }, text = { Text(s.label) })
+        val tabs: List<MusicSource?> = listOf(null) + MusicSource.entries
+        SecondaryScrollableTabRow(selectedTabIndex = tabs.indexOf(vm.source), edgePadding = 16.dp) {
+            tabs.forEach { s ->
+                Tab(
+                    selected = vm.source == s,
+                    onClick = { vm.selectSource(s) },
+                    text = {
+                        Text(
+                            s?.label ?: stringResource(R.string.all_sources),
+                            color = s?.color() ?: Color.Unspecified,
+                        )
+                    },
+                )
             }
         }
 
@@ -205,20 +232,24 @@ fun SearchScreen() {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(vm.filters()) { f ->
-                FilterChip(selected = vm.filter == f, onClick = { vm.selectFilter(f) }, label = { Text(f.label) })
+                FilterChip(
+                    selected = vm.filter == f,
+                    onClick = { vm.selectFilter(f) },
+                    label = { Text(stringResource(f.label)) },
+                )
             }
         }
 
-        if (vm.source.playsViaYouTube) {
+        val src = vm.source
+        val hint = when {
+            src == null -> stringResource(R.string.search_hint_all)
+            src.playsViaYouTube -> stringResource(R.string.search_hint_matched, src.label)
+            src == MusicSource.SOUNDCLOUD -> stringResource(R.string.search_hint_soundcloud)
+            else -> null
+        }
+        if (hint != null) {
             Text(
-                "${vm.source.label} songs play using the matching YouTube Music track.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
-            )
-        } else if (vm.source == MusicSource.SOUNDCLOUD) {
-            Text(
-                "SoundCloud tracks stream directly. Go+ tracks and downloads aren't supported.",
+                hint,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
@@ -232,7 +263,7 @@ fun SearchScreen() {
                     items(suggestions) { s ->
                         ListItem(
                             headlineContent = { Text(s) },
-                            leadingContent = { Icon(Icons.Filled.History, null) },
+                            leadingContent = { Icon(Icons.AutoMirrored.Filled.TrendingUp, null) },
                             modifier = Modifier.clickable {
                                 focus.clearFocus()
                                 vm.search(s)
@@ -243,20 +274,51 @@ fun SearchScreen() {
 
                 error != null && results.isEmpty() -> EmptyState(
                     Icons.Filled.ErrorOutline,
-                    "Couldn't search",
-                    error ?: "",
+                    stringResource(R.string.search_failed),
+                    error?.ifEmpty { null } ?: stringResource(R.string.check_connection),
                 )
+
+                vm.submitted == null && vm.query.isBlank() && history.isNotEmpty() -> LazyColumn {
+                    item {
+                        Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp)) {
+                            Text(
+                                stringResource(R.string.recent_searches),
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.align(Alignment.CenterStart),
+                            )
+                            TextButton(onClick = { c.searchHistory.clear() }, modifier = Modifier.align(Alignment.CenterEnd)) {
+                                Text(stringResource(R.string.clear_all))
+                            }
+                        }
+                    }
+                    items(history, key = { it }) { h ->
+                        ListItem(
+                            headlineContent = { Text(h) },
+                            leadingContent = { Icon(Icons.Filled.History, null) },
+                            trailingContent = {
+                                IconButton(onClick = { c.searchHistory.remove(h) }) {
+                                    Icon(Icons.Filled.Close, stringResource(R.string.remove))
+                                }
+                            },
+                            modifier = Modifier.clickable {
+                                focus.clearFocus()
+                                vm.search(h)
+                            },
+                        )
+                    }
+                }
 
                 vm.submitted == null -> EmptyState(
                     Icons.Filled.Search,
-                    "Search ${vm.source.label}",
-                    "Results play as audio only. Pick a source above; each result shows where it came from.",
+                    src?.let { stringResource(R.string.search_title_source, it.label) }
+                        ?: stringResource(R.string.search_title_all),
+                    stringResource(R.string.search_empty_body),
                 )
 
                 !loading && results.isEmpty() -> EmptyState(
                     Icons.Filled.Search,
-                    "No results",
-                    "Try another filter or source.",
+                    stringResource(R.string.no_results),
+                    stringResource(R.string.no_results_body),
                 )
 
                 else -> LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
@@ -266,7 +328,6 @@ fun SearchScreen() {
                                 r.track,
                                 onClick = { connection.play(listOf(r.track)) },
                                 onMore = { actions.openTrackMenu(r.track, emptyList()) },
-                                showSource = true,
                             )
                             is SearchResult.Collection -> CollectionRow(r.collection) {
                                 actions.navigate(Routes.online(r.collection.url))

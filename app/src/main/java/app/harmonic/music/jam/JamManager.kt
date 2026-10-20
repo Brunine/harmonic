@@ -1,5 +1,6 @@
 package app.harmonic.music.jam
 
+import app.harmonic.music.R
 import android.Manifest
 import android.bluetooth.BluetoothManager
 import android.content.ComponentName
@@ -149,10 +150,10 @@ class JamManager(private val context: Context, private val app: AppContainer) {
         }
 
         override fun onConnectionResult(endpointId: String, result: ConnectionResolution) {
-            val name = pendingNames.remove(endpointId) ?: "Guest"
+            val name = pendingNames.remove(endpointId) ?: context.getString(R.string.jam_guest)
             if (result.status.isSuccess) {
                 _state.update { s -> s.copy(members = s.members.filter { it.endpointId != endpointId } + Member(endpointId, name)) }
-                app.playerConnection.showMessage("$name joined the Jam")
+                app.playerConnection.showMessage(context.getString(R.string.jam_joined, name))
                 buildStateMessage()?.let { send(listOf(endpointId), it) }
             }
         }
@@ -160,7 +161,7 @@ class JamManager(private val context: Context, private val app: AppContainer) {
         override fun onDisconnected(endpointId: String) {
             val member = _state.value.members.firstOrNull { it.endpointId == endpointId }
             _state.update { s -> s.copy(members = s.members.filter { it.endpointId != endpointId }) }
-            member?.let { app.playerConnection.showMessage("${it.name} left the Jam") }
+            member?.let { app.playerConnection.showMessage(context.getString(R.string.jam_left, it.name)) }
         }
     }
 
@@ -182,14 +183,18 @@ class JamManager(private val context: Context, private val app: AppContainer) {
     private fun handleGuestMessage(endpointId: String, msg: JSONObject) {
         val c = controller ?: return
         val s = _state.value
-        val who = s.members.firstOrNull { it.endpointId == endpointId }?.name ?: "A guest"
+        val who = s.members.firstOrNull { it.endpointId == endpointId }?.name ?: context.getString(R.string.jam_a_guest)
         when (msg.optString("t")) {
             JamProtocol.ADD -> {
                 val tracks = JamProtocol.tracksFromJson(msg.optJSONArray("tracks"))
                 applyAdd(c, tracks, msg.optBoolean("next"))
                 if (tracks.isNotEmpty()) {
-                    val what = if (tracks.size == 1) "“${tracks[0].title}”" else "${tracks.size} songs"
-                    app.playerConnection.showMessage("$who added $what")
+                    val what = if (tracks.size == 1) {
+                        "“${tracks[0].title}”"
+                    } else {
+                        context.resources.getQuantityString(R.plurals.songs_count, tracks.size, tracks.size)
+                    }
+                    app.playerConnection.showMessage(context.getString(R.string.jam_added_by, who, what))
                 }
             }
             JamProtocol.MOVE -> applyMove(c, msg.optInt("from"), msg.optInt("to"), msg.optString("id"))
@@ -374,7 +379,7 @@ class JamManager(private val context: Context, private val app: AppContainer) {
                 _state.update { it.copy(searching = false, connectingTo = null, connected = true, error = null) }
                 startPinging()
             } else {
-                _state.update { it.copy(connectingTo = null, error = "Couldn't join. Ask the host to keep the Jam screen open and try again.") }
+                _state.update { it.copy(connectingTo = null, error = context.getString(R.string.jam_join_failed)) }
             }
         }
 
@@ -382,7 +387,7 @@ class JamManager(private val context: Context, private val app: AppContainer) {
             if (endpointId != hostEndpoint) return
             stopMirroring()
             cleanup()
-            _state.value = State(error = "The Jam ended or the host went out of range.")
+            _state.value = State(error = context.getString(R.string.jam_ended))
         }
     }
 
@@ -526,7 +531,7 @@ class JamManager(private val context: Context, private val app: AppContainer) {
         if (!isGuest) return false
         val track = tracks.getOrNull(startIndex) ?: return true
         add(listOf(track), next = false)
-        app.playerConnection.showMessage("Added “${track.title}” to the Jam")
+        app.playerConnection.showMessage(context.getString(R.string.jam_added_one, track.title))
         return true
     }
 
@@ -534,7 +539,11 @@ class JamManager(private val context: Context, private val app: AppContainer) {
         if (!isGuest) return false
         add(tracks, next)
         app.playerConnection.showMessage(
-            if (tracks.size == 1) "Added “${tracks[0].title}” to the Jam" else "Added ${tracks.size} songs to the Jam",
+            if (tracks.size == 1) {
+                context.getString(R.string.jam_added_one, tracks[0].title)
+            } else {
+                context.resources.getQuantityString(R.plurals.jam_added_many, tracks.size, tracks.size)
+            },
         )
         return true
     }
@@ -642,10 +651,10 @@ class JamManager(private val context: Context, private val app: AppContainer) {
             -> return
             ConnectionsStatusCodes.MISSING_PERMISSION_BLUETOOTH,
             ConnectionsStatusCodes.MISSING_PERMISSION_ACCESS_COARSE_LOCATION,
-            -> "Allow the nearby devices permission to use Jam."
+            -> context.getString(R.string.jam_need_permission)
             ConnectionsStatusCodes.STATUS_RADIO_ERROR ->
-                "Turn on Bluetooth (and Wi-Fi if you can) to use Jam."
-            else -> e.message ?: "Jam error"
+                context.getString(R.string.jam_need_bluetooth)
+            else -> e.message ?: context.getString(R.string.jam_error)
         }
         _state.update { it.copy(error = text) }
     }

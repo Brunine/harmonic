@@ -1,0 +1,17 @@
+# Store text files with LF line endings in the repo, whatever the OS.
+* text=auto eol=lf
+
+# Windows scripts keep CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files: never touch them
+*.ttf binary
+*.otf binary
+*.png binary
+*.webp binary
+*.jpg binary
+*.jar binary
+*.jks binary
+*.keystore binary
+*.apk binary

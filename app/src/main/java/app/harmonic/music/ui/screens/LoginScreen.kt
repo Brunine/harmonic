@@ -1,5 +1,7 @@
 package app.harmonic.music.ui.screens
 
+import app.harmonic.music.R
+import androidx.compose.ui.res.stringResource
 import android.annotation.SuppressLint
 import android.webkit.CookieManager
 import android.webkit.WebView
@@ -37,8 +39,8 @@ fun LoginScreen(onDone: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Sign in") },
-                navigationIcon = { IconButton(onClick = onDone) { Icon(Icons.Filled.Close, "Close") } },
+                title = { Text(stringResource(R.string.sign_in_title)) },
+                navigationIcon = { IconButton(onClick = onDone) { Icon(Icons.Filled.Close, stringResource(R.string.close)) } },
             )
         },
     ) { padding ->
@@ -59,7 +61,7 @@ fun LoginScreen(onDone: () -> Unit) {
                                 finished = true
                                 CookieManager.getInstance().flush()
                                 container.account.save(cookies, null)
-                                actions.showMessage("Signed in")
+                                actions.showMessage(ctx.getString(R.string.signed_in))
                                 onDone()
                             }
                         }
