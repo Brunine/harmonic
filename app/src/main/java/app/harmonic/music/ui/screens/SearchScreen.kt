@@ -26,7 +26,10 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SecondaryScrollableTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,7 +48,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.harmonic.music.AppContainer
-import app.harmonic.music.data.remote.SearchFilter
+import app.harmonic.music.data.model.MusicSource
+import app.harmonic.music.data.remote.CatalogFilter
 import app.harmonic.music.data.remote.SearchResult
 import app.harmonic.music.ui.LocalContainer
 import app.harmonic.music.ui.LocalUiActions
@@ -57,12 +61,13 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import org.schabi.newpipe.extractor.Page
 
 class SearchViewModel(private val c: AppContainer) : ViewModel() {
     var query by mutableStateOf("")
         private set
-    var filter by mutableStateOf(SearchFilter.SONGS)
+    var source by mutableStateOf(MusicSource.YOUTUBE)
+        private set
+    var filter by mutableStateOf(c.catalog.filters(MusicSource.YOUTUBE).first())
         private set
     var submitted by mutableStateOf<String?>(null)
         private set
@@ -72,9 +77,11 @@ class SearchViewModel(private val c: AppContainer) : ViewModel() {
     val loading = MutableStateFlow(false)
     val error = MutableStateFlow<String?>(null)
 
-    private var nextPage: Page? = null
+    private var next: Any? = null
     private var suggestJob: Job? = null
     private var searchJob: Job? = null
+
+    fun filters(): List<CatalogFilter> = c.catalog.filters(source)
 
     fun onQueryChange(q: String) {
         query = q
@@ -99,35 +106,46 @@ class SearchViewModel(private val c: AppContainer) : ViewModel() {
         searchJob?.cancel()
         results.value = emptyList()
         error.value = null
-        nextPage = null
+        next = null
+        val src = source
+        val f = filter
         searchJob = viewModelScope.launch {
             loading.value = true
-            runCatching { c.youtube.search(text, filter) }
+            runCatching { c.catalog.search(src, f, text) }
                 .onSuccess {
                     results.value = it.items
-                    nextPage = it.nextPage
+                    next = it.next
                 }
                 .onFailure { error.value = it.message ?: "Search failed" }
             loading.value = false
         }
     }
 
-    fun selectFilter(f: SearchFilter) {
+    fun selectSource(s: MusicSource) {
+        if (s == source) return
+        source = s
+        filter = c.catalog.filters(s).first()
+        submitted?.let { search(it) }
+    }
+
+    fun selectFilter(f: CatalogFilter) {
         if (f == filter) return
         filter = f
         submitted?.let { search(it) }
     }
 
     fun loadMore() {
-        val page = nextPage
-        val text = submitted
-        if (loading.value || text == null || !Page.isValid(page)) return
+        val token = next ?: return
+        val text = submitted ?: return
+        if (loading.value) return
+        val src = source
+        val f = filter
         searchJob = viewModelScope.launch {
             loading.value = true
-            runCatching { c.youtube.searchMore(text, filter, page!!) }
+            runCatching { c.catalog.search(src, f, text, token) }
                 .onSuccess { more ->
                     results.value = results.value + more.items
-                    nextPage = more.nextPage
+                    next = more.next
                 }
             loading.value = false
         }
@@ -175,13 +193,36 @@ fun SearchScreen() {
             }),
         )
 
+        // Where results come from
+        SecondaryScrollableTabRow(selectedTabIndex = vm.source.ordinal, edgePadding = 16.dp) {
+            MusicSource.entries.forEach { s ->
+                Tab(selected = vm.source == s, onClick = { vm.selectSource(s) }, text = { Text(s.label) })
+            }
+        }
+
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(SearchFilter.entries) { f ->
+            items(vm.filters()) { f ->
                 FilterChip(selected = vm.filter == f, onClick = { vm.selectFilter(f) }, label = { Text(f.label) })
             }
+        }
+
+        if (vm.source.playsViaYouTube) {
+            Text(
+                "${vm.source.label} songs play using the matching YouTube Music track.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+            )
+        } else if (vm.source == MusicSource.SOUNDCLOUD) {
+            Text(
+                "SoundCloud tracks stream directly. Go+ tracks and downloads aren't supported.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+            )
         }
 
         val showSuggestions = suggestions.isNotEmpty() && vm.query != vm.submitted
@@ -208,8 +249,14 @@ fun SearchScreen() {
 
                 vm.submitted == null -> EmptyState(
                     Icons.Filled.Search,
-                    "Search YouTube Music",
-                    "Results play as audio only. Tap a song to start a radio of similar music.",
+                    "Search ${vm.source.label}",
+                    "Results play as audio only. Pick a source above; each result shows where it came from.",
+                )
+
+                !loading && results.isEmpty() -> EmptyState(
+                    Icons.Filled.Search,
+                    "No results",
+                    "Try another filter or source.",
                 )
 
                 else -> LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
@@ -219,6 +266,7 @@ fun SearchScreen() {
                                 r.track,
                                 onClick = { connection.play(listOf(r.track)) },
                                 onMore = { actions.openTrackMenu(r.track, emptyList()) },
+                                showSource = true,
                             )
                             is SearchResult.Collection -> CollectionRow(r.collection) {
                                 actions.navigate(Routes.online(r.collection.url))

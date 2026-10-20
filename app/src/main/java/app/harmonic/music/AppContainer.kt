@@ -17,14 +17,21 @@ import androidx.room.Room
 import app.harmonic.music.data.db.AppDatabase
 import app.harmonic.music.data.prefs.SettingsRepository
 import app.harmonic.music.data.remote.AccountManager
+import app.harmonic.music.data.remote.AppleMusicClient
 import app.harmonic.music.data.remote.AuthenticatedPlayer
+import app.harmonic.music.data.remote.CatalogRepository
+import app.harmonic.music.data.remote.DeezerClient
 import app.harmonic.music.data.remote.NewPipeDownloader
 import app.harmonic.music.data.remote.SponsorBlockClient
 import app.harmonic.music.data.remote.Thumbnails
+import app.harmonic.music.data.remote.TrackMatcher
 import app.harmonic.music.data.remote.YouTubeRepository
 import app.harmonic.music.data.remote.YouTubeStreamInterceptor
 import app.harmonic.music.download.DownloadUtil
+import app.harmonic.music.jam.JamManager
+import app.harmonic.music.playback.RoutingDataSource
 import app.harmonic.music.playback.StreamResolver
+import app.harmonic.music.playback.trackIdFromPlaceholder
 import app.harmonic.music.ui.PlayerConnection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -61,10 +68,24 @@ class AppContainer(private val app: Application) {
     val settings = SettingsRepository(app, appScope)
     val account = AccountManager(app)
 
-    val db: AppDatabase = Room.databaseBuilder(app, AppDatabase::class.java, "harmonic.db").build()
+    val db: AppDatabase = Room.databaseBuilder(app, AppDatabase::class.java, "harmonic.db")
+        .addMigrations(AppDatabase.MIGRATION_1_2)
+        .build()
 
-    val youtube = YouTubeRepository {
+    private val thumbnailPx: () -> Int = {
         if (settings.current.dataSaverImages && isMetered()) Thumbnails.DATA_SAVER_PX else Thumbnails.NORMAL_PX
+    }
+
+    val youtube = YouTubeRepository(thumbnailPx)
+    private val matcher by lazy { TrackMatcher(youtube, db.songDao(), db.matchDao()) }
+    val catalog: CatalogRepository by lazy {
+        CatalogRepository(
+            youtube,
+            DeezerClient(okHttp, thumbnailPx),
+            AppleMusicClient(okHttp, thumbnailPx),
+            matcher,
+            okHttp,
+        )
     }
     val sponsorBlock = SponsorBlockClient(okHttp)
     private val authPlayer by lazy { AuthenticatedPlayer(okHttp, account) }
@@ -87,22 +108,19 @@ class AppContainer(private val app: Application) {
 
     val resolver: StreamResolver by lazy {
         StreamResolver(
-            app, youtube, authPlayer, account, db.formatDao(), settings,
+            app, youtube, matcher, authPlayer, account, db.formatDao(), settings,
             { playerCache }, { downloadCache }, appScope,
         )
     }
 
     private fun resolvingFactory(forDownload: Boolean): DataSource.Factory =
         ResolvingDataSource.Factory(OkHttpDataSource.Factory(streamOkHttp)) { spec ->
-            val id = spec.key ?: spec.uri.getQueryParameter("v") ?: throw IOException("Missing video id")
+            val id = spec.key ?: trackIdFromPlaceholder(spec.uri) ?: throw IOException("Missing track id")
             spec.withUri(Uri.parse(resolver.resolve(id, forDownload).url))
         }
 
-    /**
-     * Playback read path: download cache (read-only) -> player cache -> resolve + network.
-     * The stream URL is only resolved when bytes are actually missing.
-     */
-    val playbackDataSourceFactory: DataSource.Factory by lazy {
+    /** Download cache (read-only) -> player cache -> resolve + network. */
+    private val cachedFactory: DataSource.Factory by lazy {
         CacheDataSource.Factory()
             .setCache(downloadCache)
             .setCacheWriteDataSinkFactory(null)
@@ -112,6 +130,23 @@ class AppContainer(private val app: Application) {
                     .setUpstreamDataSourceFactory(resolvingFactory(forDownload = false))
                     .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR),
             )
+    }
+
+    /**
+     * Playback read path. YouTube / Deezer / Apple Music audio goes through the caches and the
+     * stream URL is only resolved when bytes are actually missing. SoundCloud HLS playlists are
+     * resolved without caching, and their segments are fetched directly.
+     */
+    val playbackDataSourceFactory: DataSource.Factory by lazy {
+        val soundCloudFactory = resolvingFactory(forDownload = false)
+        val plainFactory = OkHttpDataSource.Factory(okHttp)
+        RoutingDataSource.Factory { spec ->
+            when (spec.uri.host) {
+                "music.youtube.com" -> cachedFactory.createDataSource()
+                "soundcloud.com" -> soundCloudFactory.createDataSource()
+                else -> plainFactory.createDataSource()
+            }
+        }
     }
 
     val downloads: DownloadUtil by lazy {
@@ -127,7 +162,9 @@ class AppContainer(private val app: Application) {
         )
     }
 
-    val playerConnection by lazy { PlayerConnection(app) }
+    val playerConnection by lazy { PlayerConnection(app) { jam } }
+
+    val jam: JamManager by lazy { JamManager(app, this) }
 
     fun init() {
         val locale = Locale.getDefault()

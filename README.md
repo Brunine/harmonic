@@ -16,7 +16,15 @@ Inspired by InnerTune, OuterTune and YMusic.
 - **No ads**: streams are fetched directly, so ads are never requested. Optional SponsorBlock
   skips non-music intros/outros and sponsor segments inside music videos.
 - **Optional Google sign-in**: only used to play age-restricted tracks.
-- **Share to app**: share a YouTube / YouTube Music link to Harmonic to play it or open the playlist.
+- **More sources**: search SoundCloud, Deezer and Apple Music too. Every result is labelled with
+  its source. SoundCloud streams directly; Deezer and Apple Music audio is DRM-protected, so
+  those songs play using the matching YouTube Music track (matched by title, artist and length,
+  then remembered).
+- **Jam**: friends nearby share one queue over Nearby Connections (see below).
+- **Themes**: light / dark / system, preset palettes, wallpaper colours (Android 12+), colours
+  from the current song's cover, and a pure black mode for OLED screens.
+- **Share to app**: share a YouTube, YouTube Music, SoundCloud, Deezer or Apple Music link to
+  Harmonic to play it or open the playlist / album.
 
 ## Building the APK
 
@@ -64,6 +72,32 @@ Android Auto hides media apps that were not installed from the Play Store. On th
 open Android Auto settings → tap **Version** about 10 times to enable developer mode →
 ⋮ menu → **Developer settings** → enable **Unknown sources**. Harmonic then appears in the car's
 app launcher.
+
+## Jam
+
+One phone hosts (usually the one connected to the car); friends tap **Jam → Join a Jam**.
+
+- Guests search as usual. Tapping a song adds it to the Jam, and the track menu offers
+  "Play next in the Jam". Everyone can reorder or remove queued songs.
+- The host's normal queue *is* the Jam queue; the host can let guests control playback.
+- **Play on every phone** makes guests' phones play along. Sync is approximate (a few hundred
+  milliseconds), so it suits a room better than a car.
+- Phones talk over Bluetooth through Nearby Connections, which only switches to Wi-Fi when that
+  would not disturb the current Wi-Fi link. That keeps **wireless Android Auto** connected. Only
+  small messages (song ids and order) travel between phones; each phone streams on its own data.
+- Everyone needs Harmonic installed, Bluetooth on, and the "Nearby devices" permission.
+
+## Music sources
+
+| Source | Search | Albums / playlists | Audio | Downloads |
+|---|---|---|---|---|
+| YouTube Music | Songs, videos, albums, playlists | Yes | Direct | Yes |
+| SoundCloud | Tracks, playlists | Yes | Direct (HLS) | No (short-lived HLS links); Go+ tracks don't play |
+| Deezer | Tracks, albums, playlists | Yes (public) | YouTube Music match | Yes |
+| Apple Music | Songs, albums | Albums | YouTube Music match | Yes |
+
+Spotify isn't included: since February 2026 its API needs a developer app whose owner has
+Premium, allows 5 users and only reads playlists you own.
 
 ## How data and battery use are kept low
 

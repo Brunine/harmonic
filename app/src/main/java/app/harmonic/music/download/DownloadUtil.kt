@@ -13,6 +13,7 @@ import androidx.media3.exoplayer.offline.DownloadService
 import androidx.media3.exoplayer.scheduler.Requirements
 import app.harmonic.music.data.db.SongDao
 import app.harmonic.music.data.model.Track
+import app.harmonic.music.data.model.canDownload
 import app.harmonic.music.playback.watchUri
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -111,11 +112,16 @@ class DownloadUtil(
         }
     }
 
-    fun download(tracks: List<Track>) {
+    /**
+     * Queues offline copies. Returns how many tracks were skipped because their source can't be
+     * downloaded (SoundCloud streams are short-lived HLS playlists).
+     */
+    fun download(tracks: List<Track>): Int {
         downloadManager // make sure the manager and its listener exist
+        val allowed = tracks.filter { it.canDownload }
         scope.launch(Dispatchers.IO) {
-            songDao.upsertAll(tracks)
-            tracks.forEach { track ->
+            songDao.upsertAll(allowed)
+            allowed.forEach { track ->
                 if (_states.value[track.id]?.let { it.isDone || it.isActive } == true) return@forEach
                 // Drop any partial copy in the streaming cache so it is never mixed with the
                 // download's (possibly different) audio format.
@@ -127,6 +133,7 @@ class DownloadUtil(
                 DownloadService.sendAddDownload(context, ExoDownloadService::class.java, request, false)
             }
         }
+        return tracks.size - allowed.size
     }
 
     fun remove(id: String) {

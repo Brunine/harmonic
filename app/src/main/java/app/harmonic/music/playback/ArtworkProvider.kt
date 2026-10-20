@@ -22,7 +22,7 @@ import java.security.MessageDigest
  * to a square "album cover", and shrunk to at most 512px.
  *
  * The provider is exported (the car host must read it), so it only fetches https images from
- * YouTube's own image hosts and never arbitrary URLs.
+ * the music services' own image hosts and never arbitrary URLs.
  */
 class ArtworkProvider : ContentProvider() {
 
@@ -114,7 +114,10 @@ class ArtworkProvider : ContentProvider() {
         private fun isAllowedHost(host: String?): Boolean {
             host ?: return false
             return host == "i.ytimg.com" || host.endsWith(".ytimg.com") ||
-                host.endsWith(".googleusercontent.com") || host.endsWith(".ggpht.com")
+                host.endsWith(".googleusercontent.com") || host.endsWith(".ggpht.com") ||
+                host.endsWith(".sndcdn.com") || // SoundCloud
+                host.endsWith(".dzcdn.net") || // Deezer
+                host.endsWith(".mzstatic.com") // Apple Music
         }
 
         private fun sha1(s: String) = MessageDigest.getInstance("SHA-1")

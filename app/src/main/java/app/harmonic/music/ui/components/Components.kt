@@ -42,9 +42,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.harmonic.music.data.model.MusicSource
 import app.harmonic.music.data.model.OnlineCollection
 import app.harmonic.music.data.model.Track
 import app.harmonic.music.data.model.formatDuration
+import app.harmonic.music.data.model.source
 import app.harmonic.music.ui.LocalDownloadStates
 import coil.compose.AsyncImage
 
@@ -82,6 +84,7 @@ fun TrackRow(
     modifier: Modifier = Modifier,
     isCurrent: Boolean = false,
     leadingIndex: Int? = null,
+    showSource: Boolean = false,
 ) {
     val download = LocalDownloadStates.current[track.id]
     Row(
@@ -120,6 +123,7 @@ fun TrackRow(
                     )
                 }
                 if (track.isVideo) SmallIcon(Icons.Filled.OndemandVideo)
+                if (showSource || track.source != MusicSource.YOUTUBE) SourceBadge(track.source)
                 Text(
                     listOf(track.artist, formatDuration(track.durationSec)).filter { it.isNotEmpty() }.joinToString(" • "),
                     maxLines = 1,
@@ -133,6 +137,21 @@ fun TrackRow(
             IconButton(onClick = onMore) { Icon(Icons.Filled.MoreVert, "More") }
         }
     }
+}
+
+/** Small label showing where a result came from ("SoundCloud", "Deezer"...). */
+@Composable
+fun SourceBadge(source: MusicSource) {
+    Text(
+        source.shortLabel,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSecondaryContainer,
+        modifier = Modifier
+            .padding(end = 4.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .padding(horizontal = 4.dp, vertical = 1.dp),
+    )
 }
 
 @Composable
@@ -157,14 +176,17 @@ fun CollectionRow(item: OnlineCollection, onClick: () -> Unit) {
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                (if (item.isAlbum) "Album" else "Playlist") +
-                    if (item.subtitle.isNotEmpty()) " • ${item.subtitle}" else "",
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SourceBadge(item.source)
+                Text(
+                    (if (item.isAlbum) "Album" else "Playlist") +
+                        if (item.subtitle.isNotEmpty()) " • ${item.subtitle}" else "",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

@@ -145,8 +145,8 @@ fun LibraryScreen() {
     }
     if (importing) {
         TextInputDialog(
-            "Import from YouTube",
-            "Playlist or album link",
+            "Import playlist or album",
+            "YouTube, SoundCloud, Deezer or Apple Music link",
             "Import",
             onDismiss = { importing = false },
         ) { text ->
@@ -179,7 +179,7 @@ private fun LazyListScope.playlistsTab(
             EmptyState(
                 Icons.AutoMirrored.Filled.PlaylistPlay,
                 "No playlists",
-                "Mix online songs and downloads in your own playlists, or import one from YouTube Music.",
+                "Mix songs from any source and your downloads, or import a playlist from YouTube Music, SoundCloud, Deezer or Apple Music.",
             )
         }
     }

@@ -12,12 +12,14 @@ import app.harmonic.music.data.prefs.AudioQuality
 import app.harmonic.music.data.prefs.SettingsRepository
 import app.harmonic.music.data.remote.AccountManager
 import app.harmonic.music.data.remote.AuthenticatedPlayer
+import app.harmonic.music.data.remote.TrackMatcher
 import app.harmonic.music.data.remote.YouTubeRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.schabi.newpipe.extractor.exceptions.AgeRestrictedContentException
 import org.schabi.newpipe.extractor.exceptions.SignInConfirmNotBotException
+import org.schabi.newpipe.extractor.MediaFormat
 import org.schabi.newpipe.extractor.stream.AudioStream
 import org.schabi.newpipe.extractor.stream.AudioTrackType
 import org.schabi.newpipe.extractor.stream.DeliveryMethod
@@ -26,8 +28,12 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
 
 /**
- * Turns a video id into a direct audio-only URL, choosing the stream by network type and the
- * user's quality settings. Results are kept in memory until shortly before YouTube's expiry.
+ * Turns a track id into a direct audio-only URL, choosing the stream by network type and the
+ * user's quality settings. Results are kept in memory until shortly before they expire.
+ *
+ *  - YouTube ids: audio-only adaptive streams (signed-in fallback for age-restricted ones)
+ *  - "dz:" / "am:" ids: the matched YouTube Music track (see [TrackMatcher])
+ *  - "sc:" ids: SoundCloud's HLS playlist
  *
  * This is only consulted on a cache miss: songs that are downloaded or fully in the player
  * cache never trigger any extraction request.
@@ -36,6 +42,7 @@ import kotlin.math.abs
 class StreamResolver(
     context: Context,
     private val youtube: YouTubeRepository,
+    private val matcher: TrackMatcher,
     private val authPlayer: AuthenticatedPlayer,
     private val account: AccountManager,
     private val formatDao: FormatDao,
@@ -48,6 +55,8 @@ class StreamResolver(
 
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
     private val resolved = ConcurrentHashMap<String, Resolved>()
+    /** Matched YouTube id per Deezer / Apple Music id, so [invalidate] can clear both. */
+    private val matchedIds = ConcurrentHashMap<String, String>()
 
     private data class Candidate(val url: String, val itag: Int, val mimeType: String?, val bitrate: Int)
 
@@ -57,6 +66,23 @@ class StreamResolver(
         val now = System.currentTimeMillis()
         val cacheKey = if (forDownload) "$videoId:dl" else videoId
         resolved[cacheKey]?.let { if (it.expiresAt > now) return it }
+
+        if (videoId.startsWith("sc:")) {
+            return resolveSoundCloud(videoId).also { resolved[cacheKey] = it }
+        }
+        // Deezer / Apple Music: play the matching YouTube Music track. Formats and caches stay
+        // keyed by the original id, so downloads and the cache work for these tracks too.
+        val youtubeId = if (videoId.startsWith("dz:") || videoId.startsWith("am:")) {
+            try {
+                matcher.youtubeIdFor(videoId).also { matchedIds[videoId] = it }
+            } catch (e: IOException) {
+                throw e
+            } catch (e: Exception) {
+                throw IOException(e.message ?: "Could not match track", e)
+            }
+        } else {
+            videoId
+        }
 
         val s = settings.current
         val quality = when {
@@ -73,11 +99,11 @@ class StreamResolver(
         }
 
         val candidates = try {
-            anonymousCandidates(videoId)
+            anonymousCandidates(youtubeId)
         } catch (e: AgeRestrictedContentException) {
-            signedInCandidates(videoId, e)
+            signedInCandidates(youtubeId, e)
         } catch (e: SignInConfirmNotBotException) {
-            signedInCandidates(videoId, e)
+            signedInCandidates(youtubeId, e)
         } catch (e: IOException) {
             throw e
         } catch (e: Exception) {
@@ -99,6 +125,7 @@ class StreamResolver(
 
     /** Resolve the next track ahead of time so skipping starts instantly. Costs only metadata. */
     fun prefetch(videoId: String) {
+        if (videoId.startsWith("sc:")) return // SoundCloud URLs are short-lived; resolve on demand
         if (resolved[videoId]?.let { it.expiresAt > System.currentTimeMillis() } == true) return
         scope.launch(Dispatchers.IO) {
             // Cached or downloaded audio needs no URL at all; skip the metadata request.
@@ -111,6 +138,25 @@ class StreamResolver(
         resolved.remove(videoId)
         resolved.remove("$videoId:dl")
         youtube.invalidate(videoId)
+        matchedIds[videoId]?.let { youtube.invalidate(it) }
+    }
+
+    /** SoundCloud serves HLS; MP3 segments are the most widely decodable, then AAC, then Opus. */
+    private fun resolveSoundCloud(id: String): Resolved {
+        val streams = try {
+            youtube.streamInfoBlocking(id).audioStreams
+        } catch (e: IOException) {
+            throw e
+        } catch (e: Exception) {
+            throw IOException(e.message ?: "Could not load SoundCloud track", e)
+        }
+        val hls = streams.filter { it.deliveryMethod == DeliveryMethod.HLS && it.isUrl }
+        val chosen = hls.firstOrNull { it.format == MediaFormat.MP3 }
+            ?: hls.firstOrNull { it.format == MediaFormat.M4A }
+            ?: hls.firstOrNull()
+            ?: throw IOException("This SoundCloud track can't be streamed (it may be SoundCloud Go+ only)")
+        // SoundCloud stream links are short-lived; re-resolve after 10 minutes.
+        return Resolved(chosen.content, 0, System.currentTimeMillis() + 10 * 60 * 1000L)
     }
 
     private fun anonymousCandidates(videoId: String): List<Candidate> =

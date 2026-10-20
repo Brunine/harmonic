@@ -7,8 +7,6 @@ import app.harmonic.music.AppContainer
 import app.harmonic.music.R
 import app.harmonic.music.data.db.SongEntity
 import app.harmonic.music.data.model.Track
-import app.harmonic.music.data.remote.SearchFilter
-import app.harmonic.music.data.remote.SearchResult
 
 /**
  * The browse tree shown by Android Auto (and other media browsers):
@@ -80,11 +78,7 @@ class LibraryTree(private val context: Context, private val container: AppContai
         if (lastSearch.first == query && lastSearch.second.isNotEmpty()) return lastSearch.second
         val local = container.db.songDao().searchLocal(query, 10).map { it.toTrack() }
         val online = if (container.hasNetwork()) {
-            runCatching {
-                container.youtube.search(query, SearchFilter.SONGS).items
-                    .filterIsInstance<SearchResult.Song>()
-                    .map { it.track }
-            }.getOrDefault(emptyList())
+            runCatching { container.catalog.searchSongs(query) }.getOrDefault(emptyList())
         } else {
             emptyList()
         }

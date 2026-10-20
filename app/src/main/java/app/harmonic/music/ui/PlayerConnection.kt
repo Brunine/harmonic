@@ -9,6 +9,7 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import app.harmonic.music.data.model.Track
+import app.harmonic.music.jam.JamManager
 import app.harmonic.music.playback.PlaybackService
 import app.harmonic.music.playback.toMediaItem
 import app.harmonic.music.playback.toTrack
@@ -37,7 +38,7 @@ data class PlaybackUiState(
  * The UI's handle on the playback service. Connected while the activity is visible and
  * released in onStop, so the app process holds nothing extra in the background.
  */
-class PlayerConnection(private val context: Context) {
+class PlayerConnection(private val context: Context, private val jam: () -> JamManager) {
     private var future: ListenableFuture<MediaController>? = null
     private var controller: MediaController? = null
     private val pending = ArrayList<(MediaController) -> Unit>()
@@ -51,8 +52,13 @@ class PlayerConnection(private val context: Context) {
     private val _queue = MutableStateFlow<List<Track>>(emptyList())
     val queue: StateFlow<List<Track>> = _queue.asStateFlow()
 
-    private val _errors = MutableSharedFlow<String>(extraBufferCapacity = 4)
-    val errors: SharedFlow<String> = _errors.asSharedFlow()
+    /** Short messages for a snackbar: playback errors, Jam events. */
+    private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    val messages: SharedFlow<String> = _messages.asSharedFlow()
+
+    fun showMessage(text: String) {
+        _messages.tryEmit(text)
+    }
 
     fun connect() {
         if (future != null) return
@@ -96,7 +102,7 @@ class PlayerConnection(private val context: Context) {
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            _errors.tryEmit(error.cause?.message ?: error.message ?: "Playback error")
+            _messages.tryEmit(error.cause?.message ?: error.message ?: "Playback error")
         }
     }
 
@@ -129,8 +135,11 @@ class PlayerConnection(private val context: Context) {
         }
     }
 
+    // While this phone is a Jam guest, "play" and "queue" actions add to the shared Jam queue.
+
     fun play(tracks: List<Track>, startIndex: Int = 0, shuffle: Boolean = false) {
         if (tracks.isEmpty()) return
+        if (jam().interceptPlay(tracks, startIndex)) return
         withController { c ->
             c.shuffleModeEnabled = shuffle
             val start = if (shuffle) tracks.indices.random() else startIndex.coerceIn(tracks.indices)
@@ -140,7 +149,12 @@ class PlayerConnection(private val context: Context) {
         }
     }
 
-    fun playNext(tracks: List<Track>) = withController { c ->
+    fun playNext(tracks: List<Track>) {
+        if (jam().interceptQueue(tracks, next = true)) return
+        playNextLocal(tracks)
+    }
+
+    private fun playNextLocal(tracks: List<Track>) = withController { c ->
         if (c.mediaItemCount == 0) {
             play(tracks)
         } else {
@@ -148,7 +162,12 @@ class PlayerConnection(private val context: Context) {
         }
     }
 
-    fun addToQueue(tracks: List<Track>) = withController { c ->
+    fun addToQueue(tracks: List<Track>) {
+        if (jam().interceptQueue(tracks, next = false)) return
+        addToQueueLocal(tracks)
+    }
+
+    private fun addToQueueLocal(tracks: List<Track>) = withController { c ->
         if (c.mediaItemCount == 0) play(tracks) else c.addMediaItems(tracks.map { it.toMediaItem(context) })
     }
 

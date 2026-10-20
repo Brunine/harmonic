@@ -26,6 +26,7 @@ object Routes {
     const val HOME = "home"
     const val SEARCH = "search"
     const val LIBRARY = "library"
+    const val JAM = "jam"
     const val SETTINGS = "settings"
     const val PLAYER = "player"
     const val LOGIN = "login"

@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -59,7 +60,15 @@ import app.harmonic.music.ui.screens.PlayerScreen
 import app.harmonic.music.ui.screens.PlaylistScreen
 import app.harmonic.music.ui.screens.SearchScreen
 import app.harmonic.music.ui.screens.SettingsScreen
+import app.harmonic.music.ui.screens.JamScreen
 import app.harmonic.music.ui.theme.HarmonicTheme
+import app.harmonic.music.ui.theme.isDarkTheme
+import app.harmonic.music.ui.theme.rememberAlbumSeed
+import app.harmonic.music.data.prefs.ThemePalette
+import app.harmonic.music.data.remote.CatalogRepository
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -73,7 +82,27 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         handleIntent(intent)
         setContent {
-            HarmonicTheme {
+            val settings by container.settings.state.collectAsStateWithLifecycle()
+            val current by container.playerConnection.current.collectAsStateWithLifecycle()
+            val albumSeed = rememberAlbumSeed(current?.thumbnailUrl, settings.palette == ThemePalette.ALBUM)
+            val dark = isDarkTheme(settings.themeMode)
+            LaunchedEffect(dark) {
+                // Status / navigation bar icons follow the app theme, not just the system one.
+                val transparent = android.graphics.Color.TRANSPARENT
+                enableEdgeToEdge(
+                    statusBarStyle = if (dark) {
+                        SystemBarStyle.dark(transparent)
+                    } else {
+                        SystemBarStyle.light(transparent, transparent)
+                    },
+                    navigationBarStyle = if (dark) {
+                        SystemBarStyle.dark(transparent)
+                    } else {
+                        SystemBarStyle.light(transparent, transparent)
+                    },
+                )
+            }
+            HarmonicTheme(settings.themeMode, settings.palette, settings.pureBlack, albumSeed) {
                 HarmonicRoot(container, sharedText)
             }
         }
@@ -107,6 +136,7 @@ private val bottomTabs = listOf(
     BottomTab(Routes.HOME, "Home", Icons.Filled.Home),
     BottomTab(Routes.SEARCH, "Search", Icons.Filled.Search),
     BottomTab(Routes.LIBRARY, "Library", Icons.Filled.LibraryMusic),
+    BottomTab(Routes.JAM, "Jam", Icons.Filled.Groups),
 )
 
 @Composable
@@ -135,7 +165,7 @@ fun HarmonicRoot(container: AppContainer, sharedText: MutableStateFlow<String?>)
     RequestNotificationPermission()
 
     LaunchedEffect(Unit) {
-        container.playerConnection.errors.collect { actions.showMessage(it) }
+        container.playerConnection.messages.collect { actions.showMessage(it) }
     }
 
     // Handle links shared into the app: playlists open, single videos play right away.
@@ -144,17 +174,18 @@ fun HarmonicRoot(container: AppContainer, sharedText: MutableStateFlow<String?>)
         val text = shared ?: return@LaunchedEffect
         sharedText.value = null
         val url = extractUrl(text) ?: return@LaunchedEffect
-        val videoId = container.youtube.videoIdFromUrl(url)
-        when {
-            videoId != null -> runCatching { container.youtube.track(videoId) }
-                .onSuccess {
-                    container.playerConnection.play(listOf(it))
-                    nav.navigate(Routes.PLAYER) { launchSingleTop = true }
+        runCatching { container.catalog.resolveLink(url) }
+            .onSuccess { target ->
+                when (target) {
+                    is CatalogRepository.LinkTarget.Song -> {
+                        container.playerConnection.play(listOf(target.track))
+                        if (!container.jam.isGuest) nav.navigate(Routes.PLAYER) { launchSingleTop = true }
+                    }
+                    is CatalogRepository.LinkTarget.Collection -> nav.navigate(Routes.online(target.url))
+                    null -> actions.showMessage("Unsupported link")
                 }
-                .onFailure { actions.showMessage("Couldn't open link: ${it.message}") }
-            isPlaylistUrl(url) -> nav.navigate(Routes.online(url))
-            else -> actions.showMessage("Unsupported link")
-        }
+            }
+            .onFailure { actions.showMessage("Couldn't open link: ${it.message}") }
     }
 
     CompositionLocalProvider(
@@ -162,6 +193,7 @@ fun HarmonicRoot(container: AppContainer, sharedText: MutableStateFlow<String?>)
         LocalUiActions provides actions,
         LocalDownloadStates provides downloads,
     ) {
+        val jamState by container.jam.state.collectAsStateWithLifecycle()
         val backStack by nav.currentBackStackEntryAsState()
         val route = backStack?.destination?.route
         val showChrome = route != Routes.PLAYER && route != Routes.LOGIN
@@ -185,7 +217,13 @@ fun HarmonicRoot(container: AppContainer, sharedText: MutableStateFlow<String?>)
                                             restoreState = true
                                         }
                                     },
-                                    icon = { Icon(tab.icon, null) },
+                                    icon = {
+                                        if (tab.route == Routes.JAM && jamState.active) {
+                                            BadgedBox(badge = { Badge() }) { Icon(tab.icon, null) }
+                                        } else {
+                                            Icon(tab.icon, null)
+                                        }
+                                    },
                                     label = { Text(tab.label) },
                                 )
                             }
@@ -202,6 +240,7 @@ fun HarmonicRoot(container: AppContainer, sharedText: MutableStateFlow<String?>)
                 composable(Routes.HOME) { HomeScreen() }
                 composable(Routes.SEARCH) { SearchScreen() }
                 composable(Routes.LIBRARY) { LibraryScreen() }
+                composable(Routes.JAM) { JamScreen() }
                 composable(Routes.SETTINGS) { SettingsScreen(onBack = { nav.popBackStack() }) }
                 composable(Routes.PLAYER) { PlayerScreen(onClose = { nav.popBackStack() }) }
                 composable(Routes.LOGIN) { LoginScreen(onDone = { nav.popBackStack() }) }
