@@ -1,8 +1,10 @@
 package app.harmonic.music.ui.components
 
+import app.harmonic.music.R
+import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,13 +14,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,9 +24,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.harmonic.music.data.model.source
 import app.harmonic.music.ui.LocalContainer
 
 @Composable
@@ -40,6 +41,9 @@ fun MiniPlayer(onOpen: () -> Unit) {
     // A slow 1s tick is plenty for a thin progress line.
     val progress by remember(connection) { connection.progress(1_000) }
         .collectAsStateWithLifecycle(0L to 0L)
+    val start = MaterialTheme.colorScheme.primary
+    val end = MaterialTheme.colorScheme.tertiary
+    val track2 = MaterialTheme.colorScheme.surfaceVariant
 
     Column(
         Modifier
@@ -48,39 +52,39 @@ fun MiniPlayer(onOpen: () -> Unit) {
             .clickable(onClick = onOpen),
     ) {
         val (pos, dur) = progress
-        LinearProgressIndicator(
-            progress = { if (dur > 0) (pos.toFloat() / dur).coerceIn(0f, 1f) else 0f },
-            modifier = Modifier.fillMaxWidth().height(2.dp),
-            trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            drawStopIndicator = {},
-        )
+        val fraction = if (dur > 0) (pos.toFloat() / dur).coerceIn(0f, 1f) else 0f
+        // Neon progress line along the top edge
+        Canvas(Modifier.fillMaxWidth().height(2.dp)) {
+            drawRect(track2)
+            drawLine(
+                Brush.horizontalGradient(listOf(start, end), endX = size.width),
+                Offset(0f, size.height / 2),
+                Offset(size.width * fraction, size.height / 2),
+                strokeWidth = size.height,
+            )
+        }
         Row(
-            Modifier.padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+            Modifier.padding(start = 12.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Artwork(current.thumbnailUrl, Modifier.size(44.dp))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(current.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    current.artist,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Box(contentAlignment = Alignment.Center) {
-                if (state.isBuffering) CircularProgressIndicator(Modifier.size(36.dp), strokeWidth = 2.dp)
-                IconButton(onClick = connection::togglePlayPause) {
-                    Icon(
-                        if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        if (state.isPlaying) "Pause" else "Play",
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SourceBadge(current.source)
+                    Text(
+                        current.artist,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
+            NeonPlayButton(state.isPlaying, state.isBuffering, connection::togglePlayPause, size = 40.dp)
             IconButton(onClick = connection::next, enabled = state.hasNext) {
-                Icon(Icons.Filled.SkipNext, "Next")
+                Icon(Icons.Filled.SkipNext, stringResource(R.string.next))
             }
         }
     }

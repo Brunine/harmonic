@@ -16,6 +16,7 @@ coil = "2.7.0"
 desugar = "2.1.5"
 palette = "1.0.0"
 nearby = "19.2.0"
+reorderable = "2.5.1"
 # YouTube breaks extraction regularly: bumping this is the main maintenance task.
 # Releases: https://github.com/TeamNewPipe/NewPipeExtractor/releases
 newpipeExtractor = "v0.26.5"
@@ -37,6 +38,7 @@ media3-session = { module = "androidx.media3:media3-session", version.ref = "med
 media3-datasource-okhttp = { module = "androidx.media3:media3-datasource-okhttp", version.ref = "media3" }
 media3-exoplayer-hls = { module = "androidx.media3:media3-exoplayer-hls", version.ref = "media3" }
 palette-ktx = { module = "androidx.palette:palette-ktx", version.ref = "palette" }
+reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
 play-services-nearby = { module = "com.google.android.gms:play-services-nearby", version.ref = "nearby" }
 room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }

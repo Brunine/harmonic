@@ -1,5 +1,10 @@
 package app.harmonic.music.ui.screens
 
+import app.harmonic.music.ui.downloadMessage
+import app.harmonic.music.ui.importError
+import app.harmonic.music.R
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,7 +72,7 @@ class OnlinePlaylistViewModel(private val c: AppContainer, private val url: Stri
         viewModelScope.launch {
             runCatching { c.catalog.collection(url) }
                 .onSuccess { playlist.value = it }
-                .onFailure { error.value = it.message ?: "Couldn't load playlist" }
+                .onFailure { error.value = it.message.orEmpty() }
         }
     }
 
@@ -97,20 +102,16 @@ class OnlinePlaylistViewModel(private val c: AppContainer, private val url: Stri
         runCatching { allTracks() }.onSuccess { c.playerConnection.play(it, shuffle = shuffle) }
     }
 
-    fun downloadAll(onDone: (String) -> Unit) = viewModelScope.launch {
+    /** Reports (songs queued, SoundCloud songs skipped). */
+    fun downloadAll(onDone: (Int, Int) -> Unit) = viewModelScope.launch {
         runCatching { allTracks() }.onSuccess {
             val skipped = c.downloads.download(it)
-            onDone(
-                if (skipped == it.size) "SoundCloud tracks can't be downloaded"
-                else "Downloading ${it.size - skipped} songs",
-            )
+            onDone(it.size - skipped, skipped)
         }
     }
 
-    fun save(onDone: (String) -> Unit) = c.appScope.launch(Dispatchers.Main) {
-        runCatching { c.importPlaylist(url) }
-            .onSuccess { (_, count) -> onDone("Saved $count songs to your library") }
-            .onFailure { onDone("Couldn't save: ${it.message}") }
+    fun save(onDone: (Result<Int>) -> Unit) = c.appScope.launch(Dispatchers.Main) {
+        onDone(runCatching { c.importPlaylist(url).second })
     }
 }
 
@@ -118,6 +119,7 @@ class OnlinePlaylistViewModel(private val c: AppContainer, private val url: Stri
 fun OnlinePlaylistScreen(url: String, onBack: () -> Unit) {
     val c = LocalContainer.current
     val actions = LocalUiActions.current
+    val res = LocalContext.current.resources
     val vm: OnlinePlaylistViewModel = viewModel { OnlinePlaylistViewModel(c, url) }
     val playlist by vm.playlist.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
@@ -137,7 +139,7 @@ fun OnlinePlaylistScreen(url: String, onBack: () -> Unit) {
             TopAppBar(
                 title = { Text(playlist?.title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
                 },
             )
         },
@@ -145,7 +147,10 @@ fun OnlinePlaylistScreen(url: String, onBack: () -> Unit) {
         val p = playlist
         when {
             p == null && error != null -> EmptyState(
-                Icons.Filled.ErrorOutline, "Couldn't load", error.orEmpty(), Modifier.padding(padding),
+                Icons.Filled.ErrorOutline,
+                stringResource(R.string.load_failed),
+                error?.ifEmpty { null } ?: stringResource(R.string.check_connection),
+                Modifier.padding(padding),
             )
             p == null -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
@@ -169,18 +174,27 @@ fun OnlinePlaylistScreen(url: String, onBack: () -> Unit) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                             Button(onClick = { vm.playAll(false) }) {
                                 Icon(Icons.Filled.PlayArrow, null)
-                                Text("Play")
+                                Text(stringResource(R.string.play))
                             }
                             FilledTonalButton(onClick = { vm.playAll(true) }) {
                                 Icon(Icons.Filled.Shuffle, null)
                             }
-                            FilledTonalButton(onClick = { vm.save(actions.showMessage) }) {
-                                Icon(Icons.Filled.LibraryAdd, "Save to library")
+                            FilledTonalButton(onClick = {
+                                vm.save { result ->
+                                    actions.showMessage(
+                                        result.fold(
+                                            { n -> res.getQuantityString(R.plurals.saved_songs, n, n) },
+                                            { res.importError(it) },
+                                        ),
+                                    )
+                                }
+                            }) {
+                                Icon(Icons.Filled.LibraryAdd, stringResource(R.string.save_to_library))
                             }
                             FilledTonalButton(onClick = {
-                                vm.downloadAll(actions.showMessage)
+                                vm.downloadAll { count, skipped -> actions.showMessage(res.downloadMessage(count, skipped)) }
                             }) {
-                                Icon(Icons.Filled.Download, "Download all")
+                                Icon(Icons.Filled.Download, stringResource(R.string.download_all))
                             }
                         }
                     }

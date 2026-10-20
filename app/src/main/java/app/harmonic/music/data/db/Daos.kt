@@ -99,6 +99,17 @@ abstract class SongDao {
 
     @Query("UPDATE songs SET lastPlayedAt = 0")
     abstract suspend fun clearHistory()
+
+    @Query("SELECT * FROM songs")
+    abstract suspend fun allOnce(): List<SongEntity>
+
+    /** Merges likes and listening stats from a backup, keeping whichever is newer/higher. */
+    @Query(
+        """UPDATE songs SET liked = (liked OR :liked), likedAt = MAX(likedAt, :likedAt),
+           playCount = MAX(playCount, :playCount), lastPlayedAt = MAX(lastPlayedAt, :lastPlayedAt)
+           WHERE id = :id""",
+    )
+    abstract suspend fun mergeStats(id: String, liked: Boolean, likedAt: Long, playCount: Int, lastPlayedAt: Long)
 }
 
 @Dao
@@ -117,6 +128,12 @@ abstract class PlaylistDao {
 
     @Query("SELECT * FROM playlists ORDER BY createdAt DESC")
     abstract suspend fun allOnce(): List<PlaylistEntity>
+
+    @Query("SELECT * FROM playlists WHERE name = :name LIMIT 1")
+    abstract suspend fun findByName(name: String): PlaylistEntity?
+
+    @Query("DELETE FROM playlist_songs WHERE playlistId = :id")
+    abstract suspend fun clearEntries(id: Long)
 
     @Query("SELECT * FROM playlists WHERE id = :id")
     abstract fun observe(id: Long): Flow<PlaylistEntity?>
@@ -150,6 +167,15 @@ abstract class PlaylistDao {
     @Query("DELETE FROM playlist_songs WHERE entryId = :entryId")
     abstract suspend fun removeEntry(entryId: Long)
 
+    @Query("UPDATE playlist_songs SET position = :position WHERE entryId = :entryId")
+    abstract suspend fun setPosition(entryId: Long, position: Int)
+
+    /** Saves a new order: [entryIds] in the order they should appear. */
+    @Transaction
+    open suspend fun reorder(entryIds: List<Long>) {
+        entryIds.forEachIndexed { index, id -> setPosition(id, index) }
+    }
+
     @Query("UPDATE playlists SET name = :name WHERE id = :id")
     abstract suspend fun rename(id: Long, name: String)
 
@@ -176,4 +202,7 @@ abstract class MatchDao {
 
     @Query("DELETE FROM matches WHERE sourceId = :id")
     abstract fun delete(id: String)
+
+    @Query("SELECT * FROM matches")
+    abstract fun all(): List<MatchEntity>
 }

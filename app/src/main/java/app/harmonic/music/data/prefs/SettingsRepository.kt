@@ -1,6 +1,8 @@
 package app.harmonic.music.data.prefs
 
 import android.content.Context
+import androidx.annotation.StringRes
+import app.harmonic.music.R
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -15,26 +17,39 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.runBlocking
+import org.json.JSONObject
 
-enum class AudioQuality(val label: String, val description: String) {
-    LOW("Low", "~50 kbps Opus. About 22 MB per hour"),
-    NORMAL("Normal", "~128 kbps. About 58 MB per hour"),
-    HIGH("High", "Best available, ~160 kbps Opus"),
+enum class AudioQuality(@StringRes val label: Int, @StringRes val description: Int) {
+    LOW(R.string.quality_low, R.string.quality_low_desc),
+    NORMAL(R.string.quality_normal, R.string.quality_normal_desc),
+    HIGH(R.string.quality_high, R.string.quality_high_desc),
 }
 
-enum class ThemeMode(val label: String) { SYSTEM("Follow system"), LIGHT("Light"), DARK("Dark") }
+/** What the music does when something else needs the sound. */
+enum class InterruptAction(@StringRes val label: Int) {
+    PAUSE(R.string.action_pause),
+    LOWER(R.string.action_lower),
+    KEEP(R.string.action_keep),
+}
+
+enum class ThemeMode(@StringRes val label: Int) {
+    SYSTEM(R.string.theme_system),
+    LIGHT(R.string.theme_light),
+    DARK(R.string.theme_dark),
+}
 
 /** Colour palettes. [seed] is the key colour the whole scheme is derived from. */
-enum class ThemePalette(val label: String, val seed: Long?) {
-    WALLPAPER("Wallpaper colours", null),
-    ALBUM("Current song's cover", null),
-    EMBER("Ember", 0xFFFF6B4A),
-    OCEAN("Ocean", 0xFF2F80ED),
-    FOREST("Forest", 0xFF2E9E5B),
-    VIOLET("Violet", 0xFF8E5CF7),
-    ROSE("Rose", 0xFFE8508C),
-    SUNSET("Sunset", 0xFFF2A33A),
-    MONO("Monochrome", 0xFF808080),
+enum class ThemePalette(@StringRes val label: Int, val seed: Long?) {
+    SYNTHWAVE(R.string.palette_synthwave, 0xFFFF2E97),
+    WALLPAPER(R.string.palette_wallpaper, null),
+    ALBUM(R.string.palette_album, null),
+    EMBER(R.string.palette_ember, 0xFFFF6B4A),
+    OCEAN(R.string.palette_ocean, 0xFF2F80ED),
+    FOREST(R.string.palette_forest, 0xFF2E9E5B),
+    VIOLET(R.string.palette_violet, 0xFF8E5CF7),
+    ROSE(R.string.palette_rose, 0xFFE8508C),
+    SUNSET(R.string.palette_sunset, 0xFFF2A33A),
+    MONO(R.string.palette_mono, 0xFF808080),
 }
 
 data class AppSettings(
@@ -47,12 +62,18 @@ data class AppSettings(
     val autoplayRelated: Boolean = true,
     val audioOffload: Boolean = true,
     val dataSaverImages: Boolean = true,
-    val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val palette: ThemePalette = ThemePalette.EMBER,
+    val themeMode: ThemeMode = ThemeMode.DARK,
+    val palette: ThemePalette = ThemePalette.SYNTHWAVE,
     /** True black backgrounds in dark mode: saves battery on OLED screens. */
     val pureBlack: Boolean = false,
     /** Name shown to friends in a Jam; empty means the phone model. */
     val jamName: String = "",
+    val onCalls: InterruptAction = InterruptAction.PAUSE,
+    val onRecording: InterruptAction = InterruptAction.PAUSE,
+    val onOtherSounds: InterruptAction = InterruptAction.PAUSE,
+    val onNavigation: InterruptAction = InterruptAction.LOWER,
+    val onOtherMusic: InterruptAction = InterruptAction.PAUSE,
+    val resumeAfterInterruption: Boolean = true,
 )
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
@@ -74,10 +95,18 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         val palette = stringPreferencesKey("palette")
         val pureBlack = booleanPreferencesKey("pure_black")
         val jamName = stringPreferencesKey("jam_name")
+        val onCalls = stringPreferencesKey("on_calls")
+        val onRecording = stringPreferencesKey("on_recording")
+        val onOtherSounds = stringPreferencesKey("on_other_sounds")
+        val onNavigation = stringPreferencesKey("on_navigation")
+        val onOtherMusic = stringPreferencesKey("on_other_music")
+        val resumeAfterInterruption = booleanPreferencesKey("resume_after_interruption")
     }
 
     private fun Preferences.toSettings(): AppSettings {
         val d = AppSettings()
+        fun action(key: Preferences.Key<String>, def: InterruptAction) =
+            this[key]?.let { runCatching { InterruptAction.valueOf(it) }.getOrNull() } ?: def
         fun q(key: Preferences.Key<String>, def: AudioQuality) =
             this[key]?.let { runCatching { AudioQuality.valueOf(it) }.getOrNull() } ?: def
         return AppSettings(
@@ -94,6 +123,12 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
             palette = this[Keys.palette]?.let { runCatching { ThemePalette.valueOf(it) }.getOrNull() } ?: d.palette,
             pureBlack = this[Keys.pureBlack] ?: d.pureBlack,
             jamName = this[Keys.jamName] ?: d.jamName,
+            onCalls = action(Keys.onCalls, d.onCalls),
+            onRecording = action(Keys.onRecording, d.onRecording),
+            onOtherSounds = action(Keys.onOtherSounds, d.onOtherSounds),
+            onNavigation = action(Keys.onNavigation, d.onNavigation),
+            onOtherMusic = action(Keys.onOtherMusic, d.onOtherMusic),
+            resumeAfterInterruption = this[Keys.resumeAfterInterruption] ?: d.resumeAfterInterruption,
         )
     }
 
@@ -111,6 +146,27 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
 
     val current: AppSettings get() = state.value
 
+    /** All stored settings as JSON, for backups. */
+    suspend fun exportJson(): JSONObject {
+        val json = JSONObject()
+        store.data.first().asMap().forEach { (key, value) -> json.put(key.name, value) }
+        return json
+    }
+
+    /** Applies settings from a backup. Unknown keys are kept as they are, so older backups work. */
+    suspend fun importJson(json: JSONObject) {
+        store.edit { prefs ->
+            json.keys().forEach { name ->
+                when (val value = json.get(name)) {
+                    is Boolean -> prefs[booleanPreferencesKey(name)] = value
+                    is Int -> prefs[intPreferencesKey(name)] = value
+                    is Number -> prefs[intPreferencesKey(name)] = value.toInt()
+                    is String -> prefs[stringPreferencesKey(name)] = value
+                }
+            }
+        }
+    }
+
     suspend fun setQualityWifi(q: AudioQuality) = store.edit { it[Keys.qualityWifi] = q.name }
     suspend fun setQualityMobile(q: AudioQuality) = store.edit { it[Keys.qualityMobile] = q.name }
     suspend fun setQualityDownload(q: AudioQuality) = store.edit { it[Keys.qualityDownload] = q.name }
@@ -123,5 +179,11 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
     suspend fun setThemeMode(v: ThemeMode) = store.edit { it[Keys.themeMode] = v.name }
     suspend fun setPalette(v: ThemePalette) = store.edit { it[Keys.palette] = v.name }
     suspend fun setPureBlack(v: Boolean) = store.edit { it[Keys.pureBlack] = v }
+    suspend fun setOnCalls(v: InterruptAction) = store.edit { it[Keys.onCalls] = v.name }
+    suspend fun setOnRecording(v: InterruptAction) = store.edit { it[Keys.onRecording] = v.name }
+    suspend fun setOnOtherSounds(v: InterruptAction) = store.edit { it[Keys.onOtherSounds] = v.name }
+    suspend fun setOnNavigation(v: InterruptAction) = store.edit { it[Keys.onNavigation] = v.name }
+    suspend fun setOnOtherMusic(v: InterruptAction) = store.edit { it[Keys.onOtherMusic] = v.name }
+    suspend fun setResumeAfterInterruption(v: Boolean) = store.edit { it[Keys.resumeAfterInterruption] = v }
     suspend fun setJamName(v: String) = store.edit { it[Keys.jamName] = v.trim().take(30) }
 }

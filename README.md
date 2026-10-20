@@ -21,6 +21,13 @@ Inspired by InnerTune, OuterTune and YMusic.
   those songs play using the matching YouTube Music track (matched by title, artist and length,
   then remembered).
 - **Jam**: friends nearby share one queue over Nearby Connections (see below).
+- **Synthwave design**: Harmonic's own neon look (see the 1.2.0 notes in CHANGELOG.md).
+- **Sound interruptions**: choose Pause / Lower / Keep playing for calls, recording, other apps'
+  sounds, navigation prompts and other music apps.
+- **Everyday comfort**: sleep timer (minutes or end of song, with fade-out), search history,
+  drag-to-reorder for playlists and the queue, and backup & restore of the library to a file.
+- **Languages**: English and Português (Brasil); per-app language picker on Android 13+.
+- **Crash reports** saved on the phone and shareable from Settings.
 - **Themes**: light / dark / system, preset palettes, wallpaper colours (Android 12+), colours
   from the current song's cover, and a pure black mode for OLED screens.
 - **Share to app**: share a YouTube, YouTube Music, SoundCloud, Deezer or Apple Music link to
@@ -135,6 +142,7 @@ keyed by video id, so a song downloaded once plays offline wherever it appears.
 
 ## Releasing a new version
 
+
 1. In `app/build.gradle.kts`, raise `versionCode` by 1 and update `versionName`
    (rules at the top of [CHANGELOG.md](CHANGELOG.md)).
 2. Add a section to `CHANGELOG.md` describing what changed.
@@ -153,3 +161,7 @@ keyed by video id, so a song downloaded once plays offline wherever it appears.
   Cookies are stored in app-private storage and only sent to youtube.com for those tracks.
 - This is an unofficial client and is not affiliated with YouTube or Google. Using it may be
   against YouTube's Terms of Service; it is intended for personal use.
+
+## Licenses
+
+- Orbitron font: SIL Open Font License 1.1, see `licenses/Orbitron-OFL.txt`.

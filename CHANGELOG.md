@@ -11,8 +11,59 @@ Every release bumps both numbers in `app/build.gradle.kts`:
 
 | Version | versionCode | Date | Status |
 |---|---|---|---|
-| 1.1.0 | 2 | 2026-10-20 | In testing |
+| 1.3.0 | 4 | 2026-10-20 | In testing |
+| 1.2.0 | 3 | 2026-10-20 | Released |
+| 1.1.0 | 2 | 2026-10-20 | Released |
 | 1.0.0 | 1 | 2026-10-19 | Released |
+
+## [1.3.0] - 2026-10-20
+
+### Added
+- **Português (Brasil)**: the whole app is translated. It follows the phone's language; on
+  Android 13+ you can also pick the app's language on its own (Settings → App language).
+- **Sleep timer**: moon button on the player. 15, 30, 45, 60 or 90 minutes, or "end of this
+  song". The music fades out over the last 10 seconds, then pauses. The time left shows next to
+  the button.
+- **Search history**: your last 20 searches show when the search box is empty. Tap to search
+  again, remove one, or clear them all.
+- **Drag to reorder**: hold the ≡ handle to move songs in a playlist or in the queue.
+- **Backup & restore** (Settings → Backup): saves playlists, likes, play history, remembered
+  Deezer/Apple Music matches, search history and settings to a `.json` file you choose (Drive,
+  Downloads…). Restoring merges it into the library: playlists with the same name are replaced,
+  a song liked on either phone stays liked and the higher play count is kept. Downloaded audio files are not in the backup.
+
+### Changed
+- All on-screen text, notifications and error messages now come from translatable resources.
+
+### Notes
+- No database changes: updating from 1.2.0 keeps everything.
+
+## [1.2.0] - 2026-10-20
+
+### Added
+- **Synthwave design**: Harmonic's own look. Neon pink and cyan on deep purple, a wide
+  retro-futuristic font (Orbitron) for titles, a sunset-and-grid backdrop on the player, glowing
+  cover art, neon seek bar and play button, restyled mini player, navigation bar and launcher icon.
+  It's the new default palette; the other palettes and the light theme are still in Settings.
+- **Where each song comes from**: coloured source labels on every song (YouTube, SoundCloud,
+  Deezer, Apple), an **All sources** search tab that searches every service at once, "Playing from
+  …" on the player ("via YouTube Music" for Deezer and Apple Music), and the source in Android
+  Auto and notification subtitles.
+- **When something else needs the sound** (Settings): choose Pause, Lower volume or Keep playing
+  separately for calls, recording (voice messages, videos), other apps' short sounds, navigation
+  and Assistant prompts, and another music app (Pause or Keep). Plus "Resume afterwards".
+- **Crash reports**: crashes are saved on the phone; Settings → Crash reports → Share.
+
+### Changed
+- Audio focus is now handled by the app itself instead of the player library, to follow the
+  settings above.
+- Default theme is dark with the Synthwave palette (only for people who never changed it).
+
+### Known limitations
+- A music visualizer can't be shown in Android Auto: Android Auto doesn't let music apps draw on
+  the car screen.
+- On Android 12 and newer, when another music app starts, Android fades Harmonic out even with
+  "Keep playing".
 
 ## [1.1.0] - 2026-10-20
 

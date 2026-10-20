@@ -35,13 +35,17 @@ suspend fun AppContainer.addToPlaylist(playlistId: Long, tracks: List<Track>) = 
 suspend fun AppContainer.importPlaylist(url: String): Pair<Long, Int> {
     val collectionUrl = when (val target = catalog.resolveLink(url)) {
         is CatalogRepository.LinkTarget.Collection -> target.url
-        is CatalogRepository.LinkTarget.Song -> throw IllegalArgumentException("That's a link to a single song")
-        null -> throw IllegalArgumentException("Unsupported link")
+        is CatalogRepository.LinkTarget.Song -> throw IllegalArgumentException(LINK_IS_SONG)
+        null -> throw IllegalArgumentException(LINK_UNSUPPORTED)
     }
     val online = catalog.collectionAll(collectionUrl)
     val id = createPlaylist(online.title, online.tracks, collectionUrl)
     return id to online.tracks.size
 }
+
+/** Error codes thrown by [importPlaylist]; screens turn them into translated messages. */
+const val LINK_IS_SONG = "LINK_IS_SONG"
+const val LINK_UNSUPPORTED = "LINK_UNSUPPORTED"
 
 fun extractUrl(text: String): String? =
     Regex("https?://\\S+").find(text)?.value

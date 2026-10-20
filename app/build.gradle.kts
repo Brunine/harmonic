@@ -29,8 +29,8 @@ android {
         applicationId = "app.harmonic.music"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 4
+        versionName = "1.3.0"
         vectorDrawables.useSupportLibrary = true
     }
 
@@ -135,6 +135,7 @@ dependencies {
     implementation(libs.media3.exoplayer.hls)
     implementation(libs.palette.ktx)
     implementation(libs.play.services.nearby)
+    implementation(libs.reorderable)
 
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)

@@ -1,5 +1,8 @@
 package app.harmonic.music.ui.screens
 
+import app.harmonic.music.R
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import android.bluetooth.BluetoothAdapter
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -84,11 +87,11 @@ fun JamScreen() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Jam", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.tab_jam)) },
                 actions = {
                     if (state.active) {
                         TextButton(onClick = jam::leave) {
-                            Text(if (state.role == JamManager.Role.HOST) "End Jam" else "Leave")
+                            Text(stringResource(if (state.role == JamManager.Role.HOST) R.string.jam_end else R.string.jam_leave))
                         }
                     }
                 },
@@ -153,15 +156,14 @@ private fun JamStart(error: String?) {
     Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         EmptyState(
             Icons.Filled.Groups,
-            "Listen together",
-            "Friends nearby add songs to one shared queue. The host's phone plays it, " +
-                "for example through the car. Everyone needs Harmonic and Bluetooth on.",
+            stringResource(R.string.jam_intro_title),
+            stringResource(R.string.jam_intro_body),
         )
         OutlinedTextField(
             value = name,
             onValueChange = { name = it.take(30) },
-            label = { Text("Your name in the Jam") },
-            placeholder = { Text(android.os.Build.MODEL ?: "Phone") },
+            label = { Text(stringResource(R.string.jam_your_name)) },
+            placeholder = { Text(android.os.Build.MODEL ?: stringResource(R.string.phone)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -169,13 +171,13 @@ private fun JamStart(error: String?) {
         Button(onClick = { begin { c.jam.startHosting() } }, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Filled.Groups, null)
             Spacer(Modifier.width(8.dp))
-            Text("Start a Jam")
+            Text(stringResource(R.string.jam_start))
         }
         Spacer(Modifier.height(8.dp))
         FilledTonalButton(onClick = { begin { c.jam.startSearching() } }, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Filled.PersonAdd, null)
             Spacer(Modifier.width(8.dp))
-            Text("Join a Jam")
+            Text(stringResource(R.string.jam_join))
         }
         if (error != null) {
             Spacer(Modifier.height(16.dp))
@@ -184,8 +186,7 @@ private fun JamStart(error: String?) {
         if (permissionDenied) {
             Spacer(Modifier.height(16.dp))
             Text(
-                "Jam needs the “Nearby devices” permission to find friends' phones. " +
-                    "You can allow it in Settings → Apps → Harmonic → Permissions.",
+                stringResource(R.string.jam_permission_denied),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyMedium,
             )
@@ -199,20 +200,20 @@ private fun JamStart(error: String?) {
                 pending = null
             },
             icon = { Icon(Icons.Filled.Bluetooth, null) },
-            title = { Text("Turn on Bluetooth") },
-            text = { Text("Jam finds and talks to friends' phones over Bluetooth. Music still streams over your data.") },
+            title = { Text(stringResource(R.string.bt_title)) },
+            text = { Text(stringResource(R.string.bt_body)) },
             confirmButton = {
                 TextButton(onClick = {
                     askBluetooth = false
                     runCatching { bluetoothLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)) }
                         .onFailure { pending = null }
-                }) { Text("Turn on") }
+                }) { Text(stringResource(R.string.turn_on)) }
             },
             dismissButton = {
                 TextButton(onClick = {
                     askBluetooth = false
                     pending = null
-                }) { Text("Cancel") }
+                }) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
@@ -226,11 +227,11 @@ private fun JamDiscovery(state: JamManager.State) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(12.dp))
-                Text("Looking for Jams nearby…", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.jam_looking), style = MaterialTheme.typography.titleMedium)
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                "Ask the host to open Jam and tap “Start a Jam”. Keep the phones close together.",
+                stringResource(R.string.jam_looking_body),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -238,13 +239,13 @@ private fun JamDiscovery(state: JamManager.State) {
         }
         itemsIndexed(state.hosts, key = { _, h -> h.endpointId }) { _, host ->
             ListItem(
-                headlineContent = { Text("${host.name}'s Jam") },
+                headlineContent = { Text(stringResource(R.string.jam_of, host.name)) },
                 leadingContent = { Icon(Icons.Filled.Groups, null) },
                 trailingContent = {
                     if (state.connectingTo == host.endpointId) {
                         CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
                     } else {
-                        Text("Join", color = MaterialTheme.colorScheme.primary)
+                        Text(stringResource(R.string.join), color = MaterialTheme.colorScheme.primary)
                     }
                 },
                 modifier = Modifier.clickable(enabled = state.connectingTo == null) { jam.join(host) },
@@ -271,17 +272,16 @@ private fun JamSession(state: JamManager.State) {
             Card(Modifier.fillMaxWidth().padding(16.dp)) {
                 Column(Modifier.padding(16.dp)) {
                     Text(
-                        if (isHost) "You're hosting" else "In ${state.hostName ?: "the host"}'s Jam",
+                        if (isHost) stringResource(R.string.jam_hosting) else stringResource(R.string.jam_in, state.hostName ?: stringResource(R.string.the_host)),
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
                     )
                     Text(
                         if (isHost) {
-                            if (state.members.isEmpty()) "Waiting for friends to join…" else "${state.members.size} joined"
+                            if (state.members.isEmpty()) stringResource(R.string.jam_waiting) else pluralStringResource(R.plurals.jam_joined_count, state.members.size, state.members.size)
                         } else if (state.playEverywhere) {
-                            "Playing on every phone"
+                            stringResource(R.string.jam_playing_everywhere)
                         } else {
-                            "Playing on ${state.hostName ?: "the host"}'s phone"
+                            stringResource(R.string.jam_playing_on, state.hostName ?: stringResource(R.string.the_host))
                         },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -293,7 +293,7 @@ private fun JamSession(state: JamManager.State) {
                                     selected = false,
                                     onClick = { jam.kick(m) },
                                     label = { Text(m.name) },
-                                    trailingIcon = { Icon(Icons.Filled.Close, "Remove ${m.name}", Modifier.size(16.dp)) },
+                                    trailingIcon = { Icon(Icons.Filled.Close, stringResource(R.string.remove_person, m.name), Modifier.size(16.dp)) },
                                 )
                             }
                         }
@@ -301,14 +301,14 @@ private fun JamSession(state: JamManager.State) {
                     if (isHost) {
                         Spacer(Modifier.height(8.dp))
                         SwitchLine(
-                            "Play on every phone",
-                            "Guests' phones play along (roughly in sync). Uses their data.",
+                            stringResource(R.string.jam_play_everywhere),
+                            stringResource(R.string.jam_play_everywhere_desc),
                             state.playEverywhere,
                             jam::setPlayEverywhere,
                         )
                         SwitchLine(
-                            "Guests can control playback",
-                            "Play, pause, skip and pick songs from their phones",
+                            stringResource(R.string.jam_guest_control),
+                            stringResource(R.string.jam_guest_control_desc),
                             state.guestsCanControl,
                             jam::setGuestsCanControl,
                         )
@@ -328,7 +328,7 @@ private fun JamSession(state: JamManager.State) {
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        current?.title ?: "Nothing playing",
+                        current?.title ?: stringResource(R.string.nothing_playing),
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -346,25 +346,25 @@ private fun JamSession(state: JamManager.State) {
                 horizontalArrangement = Arrangement.Center,
             ) {
                 IconButton(onClick = { jam.control("prev") }, enabled = canControl) {
-                    Icon(Icons.Filled.SkipPrevious, "Previous")
+                    Icon(Icons.Filled.SkipPrevious, stringResource(R.string.previous))
                 }
                 IconButton(onClick = { jam.control("toggle") }, enabled = canControl) {
-                    Icon(if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, "Play or pause")
+                    Icon(if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, stringResource(R.string.play_pause))
                 }
                 IconButton(onClick = { jam.control("next") }, enabled = canControl) {
-                    Icon(Icons.Filled.SkipNext, "Next")
+                    Icon(Icons.Filled.SkipNext, stringResource(R.string.next))
                 }
             }
             Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Queue • ${state.queueSize} songs",
+                    pluralStringResource(R.plurals.jam_queue, state.queueSize, state.queueSize),
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f),
                 )
                 OutlinedButton(onClick = { actions.navigate(Routes.SEARCH) }) {
                     Icon(Icons.Filled.Search, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Add songs")
+                    Text(stringResource(R.string.add_songs))
                 }
             }
             HorizontalDivider(Modifier.padding(top = 8.dp))
@@ -374,8 +374,8 @@ private fun JamSession(state: JamManager.State) {
             item {
                 EmptyState(
                     Icons.Filled.Search,
-                    "The queue is empty",
-                    if (isHost) "Play something, or let your friends add songs." else "Search for a song and tap it to add it.",
+                    stringResource(R.string.queue_empty),
+                    stringResource(if (isHost) R.string.queue_empty_host else R.string.queue_empty_guest),
                 )
             }
         }
@@ -393,13 +393,13 @@ private fun JamSession(state: JamManager.State) {
                 )
                 if (!isCurrent) {
                     IconButton(onClick = { jam.move(index, index - 1) }, enabled = index > state.currentIndex + 1) {
-                        Icon(Icons.Filled.KeyboardArrowUp, "Move up")
+                        Icon(Icons.Filled.KeyboardArrowUp, stringResource(R.string.move_up))
                     }
                     IconButton(onClick = { jam.move(index, index + 1) }, enabled = index < state.queueSize - 1) {
-                        Icon(Icons.Filled.KeyboardArrowDown, "Move down")
+                        Icon(Icons.Filled.KeyboardArrowDown, stringResource(R.string.move_down))
                     }
                     IconButton(onClick = { jam.remove(index) }) {
-                        Icon(Icons.Filled.Close, "Remove")
+                        Icon(Icons.Filled.Close, stringResource(R.string.remove))
                     }
                 }
             }

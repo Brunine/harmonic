@@ -192,6 +192,7 @@ class PlayerConnection(private val context: Context, private val jam: () -> JamM
     }
 
     fun removeAt(index: Int) = withController { it.removeMediaItem(index) }
+    fun moveItem(from: Int, to: Int) = withController { it.moveMediaItem(from, to) }
     fun toggleShuffle() = withController { it.shuffleModeEnabled = !it.shuffleModeEnabled }
 
     fun cycleRepeat() = withController { c ->

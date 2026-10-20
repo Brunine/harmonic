@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.cache.Cache
+import app.harmonic.music.R
 import app.harmonic.music.data.db.FormatDao
 import app.harmonic.music.data.db.FormatEntity
 import app.harmonic.music.data.prefs.AudioQuality
@@ -40,7 +41,7 @@ import kotlin.math.abs
  */
 @OptIn(UnstableApi::class)
 class StreamResolver(
-    context: Context,
+    private val context: Context,
     private val youtube: YouTubeRepository,
     private val matcher: TrackMatcher,
     private val authPlayer: AuthenticatedPlayer,
@@ -76,7 +77,7 @@ class StreamResolver(
             try {
                 matcher.youtubeIdFor(videoId).also { matchedIds[videoId] = it }
             } catch (e: IOException) {
-                throw e
+                throw IOException(context.getString(R.string.err_no_match), e)
             } catch (e: Exception) {
                 throw IOException(e.message ?: "Could not match track", e)
             }
@@ -111,7 +112,7 @@ class StreamResolver(
         }
 
         val chosen = choose(candidates, quality, preferredItag)
-            ?: throw IOException("No playable audio stream for $videoId")
+            ?: throw IOException(context.getString(R.string.err_no_stream))
         if (preferredItag != null && chosen.itag != preferredItag) {
             // The cached format is no longer offered: drop the stale partial copy.
             runCatching { playerCache().removeResource(videoId) }
@@ -154,7 +155,7 @@ class StreamResolver(
         val chosen = hls.firstOrNull { it.format == MediaFormat.MP3 }
             ?: hls.firstOrNull { it.format == MediaFormat.M4A }
             ?: hls.firstOrNull()
-            ?: throw IOException("This SoundCloud track can't be streamed (it may be SoundCloud Go+ only)")
+            ?: throw IOException(context.getString(R.string.err_soundcloud_go))
         // SoundCloud stream links are short-lived; re-resolve after 10 minutes.
         return Resolved(chosen.content, 0, System.currentTimeMillis() + 10 * 60 * 1000L)
     }
@@ -171,7 +172,7 @@ class StreamResolver(
 
     private fun signedInCandidates(videoId: String, cause: Exception): List<Candidate> {
         if (!account.isLoggedIn) {
-            throw IOException("This track is age-restricted. Sign in from Settings to play it.", cause)
+            throw IOException(context.getString(R.string.err_age_restricted), cause)
         }
         return authPlayer.audioFormats(videoId).map { Candidate(it.url, it.itag, it.mimeType, it.bitrate) }
     }

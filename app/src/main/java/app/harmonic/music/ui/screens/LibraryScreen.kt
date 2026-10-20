@@ -1,5 +1,10 @@
 package app.harmonic.music.ui.screens
 
+import app.harmonic.music.R
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -61,6 +66,7 @@ import app.harmonic.music.ui.components.EmptyState
 import app.harmonic.music.ui.components.TextInputDialog
 import app.harmonic.music.ui.components.TrackRow
 import app.harmonic.music.ui.createPlaylist
+import app.harmonic.music.ui.importError
 import app.harmonic.music.ui.importPlaylist
 import app.harmonic.music.ui.extractUrl
 import kotlinx.coroutines.Dispatchers
@@ -82,12 +88,18 @@ class LibraryViewModel(private val c: AppContainer) : ViewModel() {
     fun clearHistory() = viewModelScope.launch(Dispatchers.IO) { c.db.songDao().clearHistory() }
 }
 
-private enum class LibraryTab(val label: String) { PLAYLISTS("Playlists"), DOWNLOADS("Downloads"), LIKED("Liked"), HISTORY("History") }
+private enum class LibraryTab(@StringRes val label: Int) {
+    PLAYLISTS(R.string.filter_playlists),
+    DOWNLOADS(R.string.downloads),
+    LIKED(R.string.liked),
+    HISTORY(R.string.history),
+}
 
 @Composable
 fun LibraryScreen() {
     val c = LocalContainer.current
     val actions = LocalUiActions.current
+    val res = LocalContext.current.resources
     val vm: LibraryViewModel = viewModel { LibraryViewModel(c) }
     var tab by rememberSaveable { mutableStateOf(LibraryTab.PLAYLISTS) }
     var creating by remember { mutableStateOf(false) }
@@ -101,9 +113,9 @@ fun LibraryScreen() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Library", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.tab_library)) },
                 actions = {
-                    IconButton(onClick = { actions.navigate(Routes.SETTINGS) }) { Icon(Icons.Filled.Settings, "Settings") }
+                    IconButton(onClick = { actions.navigate(Routes.SETTINGS) }) { Icon(Icons.Filled.Settings, stringResource(R.string.settings)) }
                 },
             )
         },
@@ -111,7 +123,7 @@ fun LibraryScreen() {
         Column(Modifier.fillMaxSize().padding(padding)) {
             PrimaryTabRow(selectedTabIndex = tab.ordinal) {
                 LibraryTab.entries.forEach { t ->
-                    Tab(selected = tab == t, onClick = { tab = t }, text = { Text(t.label, maxLines = 1) })
+                    Tab(selected = tab == t, onClick = { tab = t }, text = { Text(stringResource(t.label), maxLines = 1) })
                 }
             }
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
@@ -119,17 +131,17 @@ fun LibraryScreen() {
                     LibraryTab.PLAYLISTS -> playlistsTab(playlists, actions, onCreate = { creating = true }, onImport = { importing = true })
                     LibraryTab.DOWNLOADS -> tracksTab(
                         downloads, c, actions,
-                        empty = { EmptyState(Icons.Filled.DownloadForOffline, "No downloads", "Downloaded songs play offline, with no data use.") },
+                        empty = { EmptyState(Icons.Filled.DownloadForOffline, stringResource(R.string.no_downloads), stringResource(R.string.no_downloads_body)) },
                     )
                     LibraryTab.LIKED -> tracksTab(
                         liked, c, actions,
-                        empty = { EmptyState(Icons.Filled.FavoriteBorder, "No liked songs", "Tap ♡ on the player to save songs here.") },
+                        empty = { EmptyState(Icons.Filled.FavoriteBorder, stringResource(R.string.no_liked), stringResource(R.string.no_liked_body)) },
                     )
                     LibraryTab.HISTORY -> tracksTab(
                         history, c, actions,
-                        empty = { EmptyState(Icons.Filled.History, "No history", "Songs you play will show up here.") },
+                        empty = { EmptyState(Icons.Filled.History, stringResource(R.string.no_history), stringResource(R.string.no_history_body)) },
                         headerExtra = {
-                            IconButton(onClick = { vm.clearHistory() }) { Icon(Icons.Filled.DeleteSweep, "Clear history") }
+                            IconButton(onClick = { vm.clearHistory() }) { Icon(Icons.Filled.DeleteSweep, stringResource(R.string.clear_history)) }
                         },
                     )
                 }
@@ -138,25 +150,30 @@ fun LibraryScreen() {
     }
 
     if (creating) {
-        TextInputDialog("New playlist", "Name", "Create", onDismiss = { creating = false }) { name ->
+        TextInputDialog(
+            stringResource(R.string.new_playlist),
+            stringResource(R.string.name),
+            stringResource(R.string.create),
+            onDismiss = { creating = false },
+        ) { name ->
             creating = false
             c.appScope.launch(Dispatchers.Main) { c.createPlaylist(name) }
         }
     }
     if (importing) {
         TextInputDialog(
-            "Import playlist or album",
-            "YouTube, SoundCloud, Deezer or Apple Music link",
-            "Import",
+            stringResource(R.string.import_title),
+            stringResource(R.string.import_label),
+            stringResource(R.string.import_action),
             onDismiss = { importing = false },
         ) { text ->
             importing = false
             val url = extractUrl(text) ?: text.trim()
-            actions.showMessage("Importing…")
+            actions.showMessage(res.getString(R.string.importing))
             c.appScope.launch(Dispatchers.Main) {
                 runCatching { c.importPlaylist(url) }
-                    .onSuccess { (_, n) -> actions.showMessage("Imported $n songs") }
-                    .onFailure { actions.showMessage("Import failed: ${it.message}") }
+                    .onSuccess { (_, n) -> actions.showMessage(res.getQuantityString(R.plurals.imported_songs, n, n)) }
+                    .onFailure { actions.showMessage(res.importError(it)) }
             }
         }
     }
@@ -170,23 +187,23 @@ private fun LazyListScope.playlistsTab(
 ) {
     item {
         Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AssistChip(onClick = onCreate, label = { Text("New playlist") }, leadingIcon = { Icon(Icons.Filled.Add, null) })
-            AssistChip(onClick = onImport, label = { Text("Import link") }, leadingIcon = { Icon(Icons.Filled.Link, null) })
+            AssistChip(onClick = onCreate, label = { Text(stringResource(R.string.new_playlist)) }, leadingIcon = { Icon(Icons.Filled.Add, null) })
+            AssistChip(onClick = onImport, label = { Text(stringResource(R.string.import_link)) }, leadingIcon = { Icon(Icons.Filled.Link, null) })
         }
     }
     if (playlists.isEmpty()) {
         item {
             EmptyState(
                 Icons.AutoMirrored.Filled.PlaylistPlay,
-                "No playlists",
-                "Mix songs from any source and your downloads, or import a playlist from YouTube Music, SoundCloud, Deezer or Apple Music.",
+                stringResource(R.string.no_playlists),
+                stringResource(R.string.no_playlists_body),
             )
         }
     }
     items(playlists, key = { it.playlist.id }) { p ->
         ListItem(
             headlineContent = { Text(p.playlist.name) },
-            supportingContent = { Text("${p.songCount} songs") },
+            supportingContent = { Text(pluralStringResource(R.plurals.songs_count, p.songCount, p.songCount)) },
             leadingContent = { Artwork(p.thumbnailUrl, Modifier.size(56.dp)) },
             modifier = Modifier.clickable { actions.navigate(Routes.playlist(p.playlist.id)) },
         )
@@ -210,13 +227,13 @@ private fun LazyListScope.tracksTab(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("${tracks.size} songs", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Text(pluralStringResource(R.plurals.songs_count, tracks.size, tracks.size), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             headerExtra?.invoke()
             FilledTonalButton(onClick = { c.playerConnection.play(tracks, shuffle = true) }) {
-                Icon(Icons.Filled.Shuffle, "Shuffle")
+                Icon(Icons.Filled.Shuffle, stringResource(R.string.shuffle))
             }
             FilledTonalButton(onClick = { c.playerConnection.play(tracks) }) {
-                Icon(Icons.Filled.PlayArrow, "Play all")
+                Icon(Icons.Filled.PlayArrow, stringResource(R.string.play_all))
             }
         }
     }

@@ -1,5 +1,7 @@
 package app.harmonic.music.ui.screens
 
+import app.harmonic.music.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -43,6 +45,7 @@ import app.harmonic.music.ui.LocalUiActions
 import app.harmonic.music.ui.Routes
 import app.harmonic.music.ui.components.Artwork
 import app.harmonic.music.ui.components.EmptyState
+import app.harmonic.music.ui.components.HarmonicLogo
 import app.harmonic.music.ui.components.SectionHeader
 import app.harmonic.music.ui.components.TrackRow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -97,9 +100,9 @@ fun HomeScreen() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Harmonic", fontWeight = FontWeight.Bold) },
+                title = { HarmonicLogo() },
                 actions = {
-                    IconButton(onClick = { actions.navigate(Routes.SETTINGS) }) { Icon(Icons.Filled.Settings, "Settings") }
+                    IconButton(onClick = { actions.navigate(Routes.SETTINGS) }) { Icon(Icons.Filled.Settings, stringResource(R.string.settings)) }
                 },
             )
         },
@@ -109,19 +112,19 @@ fun HomeScreen() {
                 item {
                     EmptyState(
                         Icons.Filled.LibraryMusic,
-                        "Nothing here yet",
-                        "Search for a song, album or artist to start listening. Your history and recommendations will show up here.",
+                        stringResource(R.string.home_empty),
+                        stringResource(R.string.home_empty_body),
                     )
                 }
             }
 
             if (recent.isNotEmpty() && (picks.isNotEmpty() || loadingPicks || picksNeedTap)) {
                 item {
-                    SectionHeader("Quick picks") {
+                    SectionHeader(stringResource(R.string.quick_picks)) {
                         when {
-                            picksNeedTap -> TextButton(onClick = vm::loadQuickPicks) { Text("Load") }
+                            picksNeedTap -> TextButton(onClick = vm::loadQuickPicks) { Text(stringResource(R.string.load)) }
                             picks.isNotEmpty() -> IconButton(onClick = { connection.play(picks, shuffle = true) }) {
-                                Icon(Icons.Filled.Shuffle, "Shuffle")
+                                Icon(Icons.Filled.Shuffle, stringResource(R.string.shuffle))
                             }
                         }
                     }
@@ -133,7 +136,7 @@ fun HomeScreen() {
             }
 
             if (recent.isNotEmpty()) {
-                item { SectionHeader("Recently played") }
+                item { SectionHeader(stringResource(R.string.recently_played)) }
                 item {
                     LazyRow(contentPadding = PaddingValues(horizontal = 12.dp)) {
                         items(recent, key = { it.id }) { t ->
@@ -160,7 +163,7 @@ fun HomeScreen() {
             }
 
             if (mostPlayed.isNotEmpty()) {
-                item { SectionHeader("Your top songs") }
+                item { SectionHeader(stringResource(R.string.top_songs)) }
                 itemsIndexed(mostPlayed, key = { _, t -> "top-${t.id}" }) { i, t ->
                     TrackRow(
                         t,
