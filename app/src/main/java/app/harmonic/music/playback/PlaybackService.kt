@@ -21,13 +21,16 @@ import androidx.media3.exoplayer.RenderersFactory
 import androidx.media3.exoplayer.audio.MediaCodecAudioRenderer
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaLibraryService.LibraryParams
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
+import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionError
+import androidx.media3.session.SessionResult
 import app.harmonic.music.AppContainer
 import app.harmonic.music.R
 import app.harmonic.music.container
@@ -36,6 +39,8 @@ import app.harmonic.music.data.model.MusicSource
 import app.harmonic.music.data.model.Track
 import app.harmonic.music.data.model.source
 import app.harmonic.music.ui.MainActivity
+import app.harmonic.music.ui.toggleLike
+import app.harmonic.music.widget.PlayerWidget
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
@@ -74,6 +79,12 @@ class PlaybackService : MediaLibraryService() {
     private var queueSaveJob: Job? = null
     private var retriedId: String? = null
     private val radioRequested = HashSet<String>()
+
+    // Like / shuffle buttons for Android Auto, the notification and other controllers
+    private val likeCommand = SessionCommand(CMD_TOGGLE_LIKE, Bundle.EMPTY)
+    private val shuffleCommand = SessionCommand(CMD_TOGGLE_SHUFFLE, Bundle.EMPTY)
+    private var currentLiked = false
+    private var likeJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -124,6 +135,12 @@ class PlaybackService : MediaLibraryService() {
                 applyTrackParameters(it)
             }
         }
+        // Android Auto's Quick picks tab updates when a new list arrives.
+        scope.launch {
+            app.quickPicks.items.collect {
+                session.notifyChildrenChanged(LibraryTree.QUICK_PICKS, it.size, null)
+            }
+        }
         restoreQueue()
     }
 
@@ -131,6 +148,7 @@ class PlaybackService : MediaLibraryService() {
 
     override fun onDestroy() {
         saveQueueNow()
+        updateWidget(forcePaused = true)
         scope.cancel()
         session.release()
         interruptions.release()
@@ -187,6 +205,8 @@ class PlaybackService : MediaLibraryService() {
             mediaItem ?: return
             val id = mediaItem.trackId()
             app.normalizer.onTrackChanged(id)
+            watchLiked(id)
+            updateWidget()
             retriedId = null
             recordPlay(mediaItem)
             scheduleSponsorBlock(mediaItem)
@@ -204,6 +224,16 @@ class PlaybackService : MediaLibraryService() {
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             if (!isPlaying) saveQueueSoon()
+            updateWidget()
+        }
+
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            // The widget shows the intended state, so its button doesn't flicker while buffering.
+            updateWidget()
+        }
+
+        override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+            refreshButtons()
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -357,6 +387,53 @@ class PlaybackService : MediaLibraryService() {
     }
 
     // ---------------------------------------------------------------------------------------
+    // Like / shuffle buttons and the home screen widget
+    // ---------------------------------------------------------------------------------------
+
+    private fun mediaButtons(): List<CommandButton> = listOf(
+        CommandButton.Builder(if (currentLiked) CommandButton.ICON_HEART_FILLED else CommandButton.ICON_HEART_UNFILLED)
+            .setDisplayName(getString(if (currentLiked) R.string.unlike else R.string.like))
+            .setSessionCommand(likeCommand)
+            .setSlots(CommandButton.SLOT_OVERFLOW)
+            .build(),
+        CommandButton.Builder(
+            if (player.shuffleModeEnabled) CommandButton.ICON_SHUFFLE_ON else CommandButton.ICON_SHUFFLE_OFF,
+        )
+            .setDisplayName(getString(R.string.shuffle))
+            .setSessionCommand(shuffleCommand)
+            .setSlots(CommandButton.SLOT_OVERFLOW)
+            .build(),
+    )
+
+    private fun refreshButtons() {
+        if (::session.isInitialized) session.setMediaButtonPreferences(mediaButtons())
+    }
+
+    /** Keeps the heart in step with the song, including likes made in the app or the car. */
+    private fun watchLiked(id: String) {
+        likeJob?.cancel()
+        likeJob = scope.launch {
+            app.db.songDao().observe(id).map { it?.liked == true }.distinctUntilChanged().collect {
+                currentLiked = it
+                refreshButtons()
+            }
+        }
+    }
+
+    private fun updateWidget(forcePaused: Boolean = false) {
+        val item = player.currentMediaItem
+        val state = item?.toTrack()?.let { track ->
+            PlayerWidget.State(
+                title = track.title,
+                artist = track.artist,
+                thumbnailUrl = track.thumbnailUrl,
+                isPlaying = !forcePaused && player.playWhenReady,
+            )
+        }
+        PlayerWidget.update(this, state, app.appScope)
+    }
+
+    // ---------------------------------------------------------------------------------------
     // Session / browse callbacks (app UI, Android Auto, Assistant, Bluetooth)
     // ---------------------------------------------------------------------------------------
 
@@ -384,6 +461,37 @@ class PlaybackService : MediaLibraryService() {
     }
 
     private val callback = object : MediaLibrarySession.Callback {
+
+        override fun onConnect(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+        ): MediaSession.ConnectionResult {
+            val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
+                .add(likeCommand)
+                .add(shuffleCommand)
+                .build()
+            return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                .setAvailableSessionCommands(commands)
+                .setMediaButtonPreferences(mediaButtons())
+                .build()
+        }
+
+        override fun onCustomCommand(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            customCommand: SessionCommand,
+            args: Bundle,
+        ): ListenableFuture<SessionResult> = scope.future {
+            when (customCommand.customAction) {
+                CMD_TOGGLE_LIKE -> {
+                    val track = player.currentMediaItem?.toTrack()
+                    if (track != null) app.toggleLike(track) // the heart updates through watchLiked
+                }
+                CMD_TOGGLE_SHUFFLE -> player.shuffleModeEnabled = !player.shuffleModeEnabled
+                else -> return@future SessionResult(SessionError.ERROR_NOT_SUPPORTED)
+            }
+            SessionResult(SessionResult.RESULT_SUCCESS)
+        }
 
         override fun onAddMediaItems(
             mediaSession: MediaSession,
@@ -502,6 +610,8 @@ class PlaybackService : MediaLibraryService() {
         const val KEY_INDEX = "index"
         const val KEY_POSITION = "position"
         const val MAX_SAVED = 300
+        const val CMD_TOGGLE_LIKE = "harmonic.TOGGLE_LIKE"
+        const val CMD_TOGGLE_SHUFFLE = "harmonic.TOGGLE_SHUFFLE"
         const val EXTRA_SEARCH_SUPPORTED = "android.media.browse.SEARCH_SUPPORTED"
     }
 }

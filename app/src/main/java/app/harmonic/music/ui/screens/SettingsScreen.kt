@@ -178,6 +178,9 @@ fun SettingsScreen(onBack: () -> Unit) {
                 runAsync { c.settings.setDownloadWifiOnly(it) }
                 c.downloads.setWifiOnly(it)
             }
+            SwitchRow(stringResource(R.string.auto_download_liked), stringResource(R.string.auto_download_liked_desc), s.autoDownloadLiked) {
+                runAsync { c.settings.setAutoDownloadLiked(it) }
+            }
             SwitchRow(stringResource(R.string.small_artwork), stringResource(R.string.small_artwork_desc), s.dataSaverImages) {
                 runAsync { c.settings.setDataSaverImages(it) }
             }

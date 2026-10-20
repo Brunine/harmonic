@@ -7,8 +7,11 @@ Inspired by InnerTune, OuterTune and YMusic.
   and with the screen locked; lock-screen, notification, Bluetooth and Wear OS controls.
 - **Audio only**: only the audio stream is ever requested. No video decoder is created; the video
   thumbnail is center-cropped into a square album cover.
-- **Android Auto**: browse Recent, Playlists, Downloads and Liked; search, including voice
-  ("Hey Google, play … on Harmonic").
+- **Android Auto**: Quick picks, Recent, Playlists (with Liked songs) and Downloads, with cover
+  grids; like and shuffle buttons on the player; search, including voice ("Hey Google, play … on
+  Harmonic").
+- **Home screen widget** with cover and playback buttons.
+- **Download liked songs** automatically on Wi-Fi (optional).
 - **Downloads**: offline copies of any song or video (audio). Downloaded songs play offline from
   every screen, playlist and Android Auto.
 - **Playlists**: mix online and downloaded songs freely. Import any YouTube / YouTube Music

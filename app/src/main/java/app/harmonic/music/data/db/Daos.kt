@@ -126,6 +126,15 @@ abstract class PlaylistDao {
     )
     abstract fun summaries(): Flow<List<PlaylistSummary>>
 
+    @Query(
+        """SELECT p.*,
+             (SELECT COUNT(*) FROM playlist_songs ps WHERE ps.playlistId = p.id) AS songCount,
+             (SELECT s.thumbnailUrl FROM playlist_songs ps JOIN songs s ON s.id = ps.songId
+               WHERE ps.playlistId = p.id ORDER BY ps.position LIMIT 1) AS thumbnailUrl
+           FROM playlists p ORDER BY p.createdAt DESC""",
+    )
+    abstract suspend fun summariesOnce(): List<PlaylistSummary>
+
     @Query("SELECT * FROM playlists ORDER BY createdAt DESC")
     abstract suspend fun allOnce(): List<PlaylistEntity>
 

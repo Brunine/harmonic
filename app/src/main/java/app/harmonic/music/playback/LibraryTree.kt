@@ -1,21 +1,26 @@
 package app.harmonic.music.playback
 
 import android.content.Context
+import android.os.Bundle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.session.MediaConstants
 import app.harmonic.music.AppContainer
 import app.harmonic.music.R
 import app.harmonic.music.data.db.SongEntity
 import app.harmonic.music.data.model.Track
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The browse tree shown by Android Auto (and other media browsers):
  *
- *   root
+ *   root                (Android Auto shows these four as tabs)
+ *   ├── Quick picks     (recommendations, a grid of covers, cached so it opens instantly)
  *   ├── Recent          (playable songs)
- *   ├── Playlists       ├── <playlist>  (playable songs)
- *   ├── Downloads       (playable songs, works offline)
- *   └── Liked           (playable songs)
+ *   ├── Playlists       (a grid of covers)
+ *   │   ├── Liked songs (playable songs)
+ *   │   └── <playlist>  (playable songs)
+ *   └── Downloads       (playable songs, works offline)
  *
  * Song children get ids "<parentId>|<videoId>" so that tapping one queues the whole list.
  */
@@ -25,13 +30,24 @@ class LibraryTree(private val context: Context, private val container: AppContai
 
     suspend fun children(parentId: String): List<MediaItem> = when {
         parentId == ROOT -> listOf(
+            folder(
+                QUICK_PICKS, context.getString(R.string.quick_picks), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED,
+                childStyle = MediaConstants.EXTRAS_KEY_CONTENT_STYLE_PLAYABLE,
+            ),
             folder(RECENT, context.getString(R.string.auto_recent), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED),
-            folder(PLAYLISTS, context.getString(R.string.auto_playlists), MediaMetadata.MEDIA_TYPE_FOLDER_PLAYLISTS),
+            folder(
+                PLAYLISTS, context.getString(R.string.auto_playlists), MediaMetadata.MEDIA_TYPE_FOLDER_PLAYLISTS,
+                childStyle = MediaConstants.EXTRAS_KEY_CONTENT_STYLE_BROWSABLE,
+            ),
             folder(DOWNLOADS, context.getString(R.string.auto_downloads), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED),
-            folder(LIKED, context.getString(R.string.auto_liked), MediaMetadata.MEDIA_TYPE_FOLDER_MIXED),
         )
-        parentId == PLAYLISTS -> container.db.playlistDao().allOnce().map {
-            folder("$PLAYLIST_PREFIX${it.id}", it.name, MediaMetadata.MEDIA_TYPE_PLAYLIST)
+        parentId == PLAYLISTS -> {
+            val likedCover = container.db.songDao().likedOnce(1).firstOrNull()?.thumbnailUrl
+            listOf(
+                folder(LIKED, context.getString(R.string.auto_liked), MediaMetadata.MEDIA_TYPE_PLAYLIST, likedCover),
+            ) + container.db.playlistDao().summariesOnce().map {
+                folder("$PLAYLIST_PREFIX${it.playlist.id}", it.playlist.name, MediaMetadata.MEDIA_TYPE_PLAYLIST, it.thumbnailUrl)
+            }
         }
         else -> tracksFor(parentId).map { it.toMediaItem(context, "$parentId|${it.id}") }
     }
@@ -42,6 +58,7 @@ class LibraryTree(private val context: Context, private val container: AppContai
             val (q, results) = lastSearch
             return if (parentId.removePrefix(SEARCH_PREFIX) == q) results else search(parentId.removePrefix(SEARCH_PREFIX))
         }
+        if (parentId == QUICK_PICKS) return quickPicks()
         val songs = container.db.songDao()
         val list: List<SongEntity> = when {
             parentId == RECENT -> songs.recentOnce(LIMIT)
@@ -60,7 +77,7 @@ class LibraryTree(private val context: Context, private val container: AppContai
         if (mediaId == ROOT) return root()
         if ('|' !in mediaId) {
             children(ROOT).firstOrNull { it.mediaId == mediaId }?.let { return it }
-            if (mediaId.startsWith(PLAYLIST_PREFIX)) {
+            if (mediaId.startsWith(PLAYLIST_PREFIX) || mediaId == LIKED) {
                 return children(PLAYLISTS).firstOrNull { it.mediaId == mediaId }
             }
             return container.db.songDao().get(mediaId)?.toTrack()?.toMediaItem(context)
@@ -90,7 +107,31 @@ class LibraryTree(private val context: Context, private val container: AppContai
     fun searchItems(query: String, results: List<Track>): List<MediaItem> =
         results.map { it.toMediaItem(context, "$SEARCH_PREFIX$query|${it.id}") }
 
-    private fun folder(id: String, title: String, type: Int) = MediaItem.Builder()
+    /**
+     * Cached recommendations; refreshed in the background. With nothing cached yet, waits a
+     * few seconds for a first list rather than showing an empty tab.
+     */
+    private suspend fun quickPicks(): List<Track> {
+        val picks = container.quickPicks
+        if (picks.items.value.isEmpty() && container.hasNetwork()) {
+            withTimeoutOrNull(8_000) { picks.refresh() }
+        } else {
+            picks.refreshIfNeeded()
+        }
+        return picks.items.value
+    }
+
+    /**
+     * [childStyle] (a content style key) shows this folder's children as a grid of covers
+     * instead of a list. [coverUrl] is the folder's own artwork.
+     */
+    private fun folder(
+        id: String,
+        title: String,
+        type: Int,
+        coverUrl: String? = null,
+        childStyle: String? = null,
+    ) = MediaItem.Builder()
         .setMediaId(id)
         .setMediaMetadata(
             MediaMetadata.Builder()
@@ -98,12 +139,19 @@ class LibraryTree(private val context: Context, private val container: AppContai
                 .setIsBrowsable(true)
                 .setIsPlayable(false)
                 .setMediaType(type)
+                .setArtworkUri(ArtworkProvider.uriFor(context, coverUrl))
+                .apply {
+                    if (childStyle != null) {
+                        setExtras(Bundle().apply { putInt(childStyle, MediaConstants.EXTRAS_VALUE_CONTENT_STYLE_GRID_ITEM) })
+                    }
+                }
                 .build(),
         )
         .build()
 
     companion object {
         const val ROOT = "root"
+        const val QUICK_PICKS = "quickpicks"
         const val RECENT = "recent"
         const val PLAYLISTS = "playlists"
         const val DOWNLOADS = "downloads"

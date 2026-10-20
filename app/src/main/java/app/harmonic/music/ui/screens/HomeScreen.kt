@@ -64,24 +64,20 @@ class HomeViewModel(private val c: AppContainer) : ViewModel() {
         .map { list -> list.map { it.toTrack() } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val quickPicks = MutableStateFlow<List<Track>>(emptyList())
-    val loadingPicks = MutableStateFlow(false)
-    /** On mobile data recommendations are loaded only on request. */
+    /** Shared with Android Auto's "Quick picks" folder; the last list shows right away. */
+    val quickPicks: StateFlow<List<Track>> = c.quickPicks.items
+    val loadingPicks: StateFlow<Boolean> = c.quickPicks.loading
+    /** On mobile data, with nothing cached yet, recommendations load only on request. */
     val picksNeedTap = MutableStateFlow(false)
 
     init {
-        if (c.isMetered()) picksNeedTap.value = true else loadQuickPicks()
+        if (c.isMetered() && c.quickPicks.items.value.isEmpty()) picksNeedTap.value = true
+        c.quickPicks.refreshIfNeeded()
     }
 
     fun loadQuickPicks() {
-        if (loadingPicks.value) return
         picksNeedTap.value = false
-        viewModelScope.launch {
-            val seed = c.db.songDao().recentOnce(1).firstOrNull() ?: return@launch
-            loadingPicks.value = true
-            quickPicks.value = runCatching { c.catalog.related(seed.toTrack()).take(12) }.getOrDefault(emptyList())
-            loadingPicks.value = false
-        }
+        viewModelScope.launch { c.quickPicks.refresh() }
     }
 }
 
