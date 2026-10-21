@@ -3,6 +3,7 @@ package app.harmonic.music.data.remote
 import androidx.annotation.StringRes
 import app.harmonic.music.R
 import app.harmonic.music.data.model.MusicSource
+import app.harmonic.music.data.model.SongVersions
 import app.harmonic.music.data.model.Track
 import app.harmonic.music.data.model.source
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +28,7 @@ class CatalogRepository(
     private val apple: AppleMusicClient,
     private val matcher: TrackMatcher,
     private val client: OkHttpClient,
+    private val browser: YouTubeMusicBrowser,
 ) {
     fun filters(source: MusicSource): List<CatalogFilter> = when (source) {
         MusicSource.YOUTUBE -> listOf(
@@ -206,12 +208,27 @@ class CatalogRepository(
     // Radio
     // ---------------------------------------------------------------------------------------
 
-    /** What to play after [track]: the source's own recommendations, or YouTube's for its match. */
-    suspend fun related(track: Track): List<Track> = when {
-        track.source.playsViaYouTube -> {
-            val ytId = withContext(Dispatchers.IO) { matcher.youtubeIdFor(track.id) }
-            youtube.related(ytId)
+    /**
+     * What to play after [track]. YouTube (and Deezer / Apple Music through their YouTube match)
+     * use YouTube Music's song radio, which stays close to the song's style; YouTube's related
+     * videos are the fallback, and SoundCloud uses its own recommendations. Other versions of
+     * the same song (acoustic, live, radio edit...) are left out.
+     */
+    suspend fun related(track: Track): List<Track> {
+        val youtubeId = when {
+            track.source == MusicSource.SOUNDCLOUD -> null
+            track.source.playsViaYouTube -> withContext(Dispatchers.IO) { matcher.youtubeIdFor(track.id) }
+            else -> track.id
         }
-        else -> youtube.related(track.id)
+        val list = if (youtubeId == null) {
+            youtube.related(track.id)
+        } else {
+            runCatching { browser.radio(youtubeId) }.getOrNull()?.takeIf { it.isNotEmpty() }
+                ?: youtube.related(youtubeId)
+        }
+        return SongVersions.distinct(
+            list.filter { it.id != track.id && it.id != youtubeId },
+            exclude = setOf(SongVersions.key(track)),
+        )
     }
 }

@@ -26,6 +26,7 @@ import app.harmonic.music.data.remote.SponsorBlockClient
 import app.harmonic.music.data.remote.Thumbnails
 import app.harmonic.music.data.remote.LyricsClient
 import app.harmonic.music.data.remote.YouTubeMusicBrowser
+import app.harmonic.music.data.remote.UpdateChecker
 import app.harmonic.music.data.remote.TrackMatcher
 import app.harmonic.music.data.remote.YouTubeRepository
 import app.harmonic.music.data.remote.YouTubeStreamInterceptor
@@ -94,10 +95,11 @@ class AppContainer(private val app: Application) {
             AppleMusicClient(okHttp, thumbnailPx),
             matcher,
             okHttp,
+            browser,
         )
     }
     val sponsorBlock = SponsorBlockClient(okHttp)
-    val browser by lazy { YouTubeMusicBrowser(okHttp, thumbnailPx) }
+    val browser by lazy { YouTubeMusicBrowser(okHttp, thumbnailPx, account) }
     val lyrics by lazy { LyricsClient(okHttp, app.cacheDir) }
     private val authPlayer by lazy { AuthenticatedPlayer(okHttp, account) }
 
@@ -184,6 +186,9 @@ class AppContainer(private val app: Application) {
     val searchHistory by lazy { SearchHistory(app) }
     val quickPicks by lazy {
         QuickPicks(app, db.songDao(), { catalog }, ::isMetered, ::hasNetwork, appScope)
+    }
+    val updates by lazy {
+        UpdateChecker(app, okHttp, appScope, { settings.current.checkUpdates }, ::hasNetwork)
     }
     val autoDownloader by lazy { AutoDownloader(app, db.songDao(), settings, { downloads }, appScope) }
 

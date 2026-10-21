@@ -66,6 +66,8 @@ import app.harmonic.music.ui.LocalUiActions
 import app.harmonic.music.ui.Routes
 import app.harmonic.music.ui.theme.paletteSwatch
 import kotlinx.coroutines.Dispatchers
+import app.harmonic.music.data.remote.AppUpdate
+import app.harmonic.music.ui.components.UpdateDialog
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -90,6 +92,8 @@ fun SettingsScreen(onBack: () -> Unit) {
     var crashCount by remember { mutableIntStateOf(CrashLog.reports(context).size) }
     var cacheUsed by remember { mutableLongStateOf(-1L) }
     var downloadsUsed by remember { mutableLongStateOf(-1L) }
+    var foundUpdate by remember { mutableStateOf<AppUpdate?>(null) }
+    var checkingUpdate by remember { mutableStateOf(false) }
 
     fun runAsync(block: suspend () -> Unit) {
         c.appScope.launch(Dispatchers.Main) { block() }
@@ -245,6 +249,9 @@ fun SettingsScreen(onBack: () -> Unit) {
 
             Header(R.string.account)
             if (signedIn) {
+                ClickRow(stringResource(R.string.yt_library_title), stringResource(R.string.yt_library_desc)) {
+                    actions.navigate(Routes.ACCOUNT_LIBRARY)
+                }
                 ClickRow(stringResource(R.string.sign_out), stringResource(R.string.sign_out_desc)) { c.account.logout() }
             } else {
                 ClickRow(stringResource(R.string.sign_in), stringResource(R.string.sign_in_desc)) {
@@ -282,7 +289,31 @@ fun SettingsScreen(onBack: () -> Unit) {
                 headlineContent = { Text("Harmonic ${BuildConfig.VERSION_NAME}") },
                 supportingContent = { Text(stringResource(R.string.about_desc)) },
             )
+            ClickRow(
+                stringResource(R.string.check_updates),
+                if (checkingUpdate) stringResource(R.string.checking_updates) else stringResource(R.string.check_updates_desc),
+            ) {
+                if (!checkingUpdate) {
+                    checkingUpdate = true
+                    runAsync {
+                        runCatching { c.updates.check() }
+                            .onSuccess { found ->
+                                if (found != null) foundUpdate = found
+                                else actions.showMessage(res.getString(R.string.up_to_date, c.updates.currentVersion))
+                            }
+                            .onFailure { actions.showMessage(res.getString(R.string.update_check_failed)) }
+                        checkingUpdate = false
+                    }
+                }
+            }
+            SwitchRow(stringResource(R.string.auto_check_updates), stringResource(R.string.auto_check_updates_desc), s.checkUpdates) {
+                runAsync { c.settings.setCheckUpdates(it) }
+            }
         }
+    }
+
+    foundUpdate?.let { u ->
+        UpdateDialog(u, onLater = { foundUpdate = null }, onClose = { foundUpdate = null })
     }
 
     qualityDialog?.let { target ->

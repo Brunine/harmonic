@@ -34,6 +34,7 @@ object Routes {
     const val ONLINE = "online?url={url}"
     const val ARTIST = "artist/{id}"
     const val ALBUM = "album/{id}"
+    const val ACCOUNT_LIBRARY = "account_library"
 
     fun playlist(id: Long) = "playlist/$id"
     fun online(url: String) = "online?url=${Uri.encode(url)}"

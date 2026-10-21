@@ -36,6 +36,7 @@ import app.harmonic.music.R
 import app.harmonic.music.container
 import app.harmonic.music.data.db.toEntity
 import app.harmonic.music.data.model.MusicSource
+import app.harmonic.music.data.model.SongVersions
 import app.harmonic.music.data.model.Track
 import app.harmonic.music.data.model.source
 import app.harmonic.music.ui.MainActivity
@@ -120,7 +121,8 @@ class PlaybackService : MediaLibraryService() {
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        session = MediaLibrarySession.Builder(this, player, callback)
+        // Wrapped so Android Auto's queue list doesn't jump to the top while songs load.
+        session = MediaLibrarySession.Builder(this, QueueStablePlayer(player), callback)
             .setSessionActivity(sessionActivity)
             .build()
 
@@ -267,9 +269,15 @@ class PlaybackService : MediaLibraryService() {
         if (!app.hasNetwork() || !radioRequested.add(id)) return
         scope.launch {
             val related = runCatching { app.catalog.related(track) }.getOrNull() ?: return@launch
-            val existing = HashSet<String>()
-            for (i in 0 until player.mediaItemCount) existing += player.getMediaItemAt(i).trackId()
-            val toAdd = related.filter { it.id !in existing }.take(20)
+            // Skip songs already queued, including other versions of them (acoustic, live...).
+            val existingIds = HashSet<String>()
+            val existingSongs = HashSet<String>()
+            for (i in 0 until player.mediaItemCount) {
+                val queued = player.getMediaItemAt(i).toTrack()
+                existingIds += queued.id
+                existingSongs += SongVersions.key(queued)
+            }
+            val toAdd = SongVersions.distinct(related.filter { it.id !in existingIds }, existingSongs).take(20)
             if (toAdd.isNotEmpty()) {
                 player.addMediaItems(toAdd.map { it.toMediaItem(this@PlaybackService) })
             }
