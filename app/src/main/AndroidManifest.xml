@@ -51,6 +51,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Jam QR codes: harmonic://jam/K7QX opens the app ready to join that Jam -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="harmonic" android:host="jam" />
+            </intent-filter>
             <!-- "Share" a YouTube / YouTube Music link to the app to play it -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
@@ -110,6 +117,11 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_player_info" />
         </receiver>
+
+        <!-- Google's QR scanner (Jam codes) is downloaded with the app instead of on first use -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode_ui" />
 
         <!-- Android Auto -->
         <meta-data

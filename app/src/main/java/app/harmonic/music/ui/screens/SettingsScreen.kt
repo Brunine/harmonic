@@ -64,6 +64,7 @@ import app.harmonic.music.data.prefs.ThemePalette
 import app.harmonic.music.ui.LocalContainer
 import app.harmonic.music.ui.LocalUiActions
 import app.harmonic.music.ui.Routes
+import app.harmonic.music.ui.theme.designSwatch
 import app.harmonic.music.ui.theme.paletteSwatch
 import kotlinx.coroutines.Dispatchers
 import app.harmonic.music.data.remote.AppUpdate
@@ -157,6 +158,9 @@ fun SettingsScreen(onBack: () -> Unit) {
             Header(R.string.appearance)
             ClickRow(stringResource(R.string.theme), stringResource(s.themeMode.label)) { themeDialog = true }
             ClickRow(stringResource(R.string.colours), stringResource(s.palette.label)) { paletteDialog = true }
+            SwitchRow(stringResource(R.string.system_font), stringResource(R.string.system_font_desc), s.systemFont) {
+                runAsync { c.settings.setSystemFont(it) }
+            }
             SwitchRow(
                 stringResource(R.string.pure_black),
                 stringResource(R.string.pure_black_desc),
@@ -411,16 +415,24 @@ private fun PaletteDialog(selected: ThemePalette, onDismiss: () -> Unit, onSelec
                         supportingContent = when (palette) {
                             ThemePalette.WALLPAPER -> ({ Text(stringResource(R.string.palette_wallpaper_desc)) })
                             ThemePalette.ALBUM -> ({ Text(stringResource(R.string.palette_album_desc)) })
+                            ThemePalette.SYNTHWAVE -> ({ Text(stringResource(R.string.palette_synthwave_desc)) })
+                            ThemePalette.CYBER_NOIR -> ({ Text(stringResource(R.string.palette_cyber_noir_desc)) })
+                            ThemePalette.NEO_GOTHIC -> ({ Text(stringResource(R.string.palette_neo_gothic_desc)) })
+                            ThemePalette.CYBERPUNK -> ({ Text(stringResource(R.string.palette_cyberpunk_desc)) })
+                            ThemePalette.MATRIX -> ({ Text(stringResource(R.string.palette_matrix_desc)) })
                             else -> null
                         },
                         leadingContent = {
                             val swatch = paletteSwatch(palette)
+                            val designColours = designSwatch(palette)
                             Box(
                                 Modifier
                                     .size(28.dp)
                                     .clip(CircleShape)
                                     .background(
-                                        if (swatch != null) {
+                                        if (designColours != null) {
+                                            Brush.linearGradient(designColours)
+                                        } else if (swatch != null) {
                                             Brush.linearGradient(listOf(swatch, swatch))
                                         } else {
                                             Brush.sweepGradient(

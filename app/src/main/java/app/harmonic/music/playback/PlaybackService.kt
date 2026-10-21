@@ -8,6 +8,7 @@ import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
@@ -39,6 +40,8 @@ import app.harmonic.music.data.model.MusicSource
 import app.harmonic.music.data.model.SongVersions
 import app.harmonic.music.data.model.Track
 import app.harmonic.music.data.model.source
+import app.harmonic.music.jam.JamManager
+import app.harmonic.music.jam.JamQr
 import app.harmonic.music.ui.MainActivity
 import app.harmonic.music.ui.toggleLike
 import app.harmonic.music.widget.PlayerWidget
@@ -84,8 +87,13 @@ class PlaybackService : MediaLibraryService() {
     // Like / shuffle buttons for Android Auto, the notification and other controllers
     private val likeCommand = SessionCommand(CMD_TOGGLE_LIKE, Bundle.EMPTY)
     private val shuffleCommand = SessionCommand(CMD_TOGGLE_SHUFFLE, Bundle.EMPTY)
+    private val jamCommand = SessionCommand(CMD_JAM, Bundle.EMPTY)
     private var currentLiked = false
     private var likeJob: Job? = null
+
+    /** What the session (car, notification, lock screen) sees; can show the Jam QR code. */
+    private lateinit var sessionPlayer: QueueStablePlayer
+    private var overlayJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -122,7 +130,8 @@ class PlaybackService : MediaLibraryService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         // Wrapped so Android Auto's queue list doesn't jump to the top while songs load.
-        session = MediaLibrarySession.Builder(this, QueueStablePlayer(player), callback)
+        sessionPlayer = QueueStablePlayer(player)
+        session = MediaLibrarySession.Builder(this, sessionPlayer, callback)
             .setSessionActivity(sessionActivity)
             .build()
 
@@ -411,7 +420,74 @@ class PlaybackService : MediaLibraryService() {
             .setSessionCommand(shuffleCommand)
             .setSlots(CommandButton.SLOT_OVERFLOW)
             .build(),
+        CommandButton.Builder(CommandButton.ICON_UNDEFINED)
+            .setCustomIconResId(R.drawable.ic_car_jam)
+            .setDisplayName(getString(R.string.car_jam))
+            .setSessionCommand(jamCommand)
+            .setSlots(CommandButton.SLOT_OVERFLOW)
+            .build(),
     )
+
+    /**
+     * The car's Jam button. No Jam yet: starts one (when nothing needs to be asked first) and
+     * shows its QR code. Hosting: shows or hides the QR code in place of the album art, so
+     * passengers can scan it from the car screen. It hides by itself after a while.
+     */
+    private fun onJamButton() {
+        if (sessionPlayer.overlay != null) {
+            hideOverlay()
+            return
+        }
+        val jam = app.jam
+        val state = jam.state.value
+        when {
+            state.role == JamManager.Role.HOST && state.code != null -> showJamCode(state.code)
+            state.active -> showNotice(getString(R.string.car_jam_guest))
+            jam.canStartWithoutAsking() -> {
+                jam.startHosting()
+                jam.state.value.code?.let { showJamCode(it) }
+            }
+            else -> showNotice(getString(R.string.car_jam_open_phone))
+        }
+    }
+
+    private fun showJamCode(code: String) {
+        val base = player.mediaMetadata
+        val overlay = base.buildUpon()
+            .setTitle(getString(R.string.car_jam_scan))
+            .setDisplayTitle(getString(R.string.car_jam_scan))
+            .setArtist(getString(R.string.car_jam_code, code))
+            .setSubtitle(getString(R.string.car_jam_code, code))
+            .setArtworkUri(null)
+            .setArtworkData(JamQr.png(code), MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+            .build()
+        showOverlay(overlay, JAM_QR_MS)
+    }
+
+    /** A short message in place of the song title (the car can't show pop-ups). */
+    private fun showNotice(text: String) {
+        val overlay = player.mediaMetadata.buildUpon()
+            .setTitle(text)
+            .setDisplayTitle(text)
+            .setArtist(getString(R.string.app_name))
+            .build()
+        showOverlay(overlay, NOTICE_MS)
+    }
+
+    private fun showOverlay(metadata: MediaMetadata, durationMs: Long) {
+        overlayJob?.cancel()
+        sessionPlayer.overlay = metadata
+        overlayJob = scope.launch {
+            delay(durationMs)
+            hideOverlay()
+        }
+    }
+
+    private fun hideOverlay() {
+        overlayJob?.cancel()
+        overlayJob = null
+        sessionPlayer.overlay = null
+    }
 
     private fun refreshButtons() {
         if (::session.isInitialized) session.setMediaButtonPreferences(mediaButtons())
@@ -477,6 +553,7 @@ class PlaybackService : MediaLibraryService() {
             val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
                 .add(likeCommand)
                 .add(shuffleCommand)
+                .add(jamCommand)
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(commands)
@@ -496,6 +573,7 @@ class PlaybackService : MediaLibraryService() {
                     if (track != null) app.toggleLike(track) // the heart updates through watchLiked
                 }
                 CMD_TOGGLE_SHUFFLE -> player.shuffleModeEnabled = !player.shuffleModeEnabled
+                CMD_JAM -> onJamButton()
                 else -> return@future SessionResult(SessionError.ERROR_NOT_SUPPORTED)
             }
             SessionResult(SessionResult.RESULT_SUCCESS)
@@ -620,6 +698,9 @@ class PlaybackService : MediaLibraryService() {
         const val MAX_SAVED = 300
         const val CMD_TOGGLE_LIKE = "harmonic.TOGGLE_LIKE"
         const val CMD_TOGGLE_SHUFFLE = "harmonic.TOGGLE_SHUFFLE"
+        const val CMD_JAM = "harmonic.JAM"
+        const val JAM_QR_MS = 90_000L
+        const val NOTICE_MS = 8_000L
         const val EXTRA_SEARCH_SUPPORTED = "android.media.browse.SEARCH_SUPPORTED"
     }
 }

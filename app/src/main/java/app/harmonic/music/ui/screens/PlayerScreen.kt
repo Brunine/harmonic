@@ -72,7 +72,7 @@ import app.harmonic.music.ui.components.LyricsPanel
 import app.harmonic.music.ui.components.NeonArtwork
 import app.harmonic.music.ui.components.NeonPlayButton
 import app.harmonic.music.ui.components.NeonSeekBar
-import app.harmonic.music.ui.components.RetroBackdrop
+import app.harmonic.music.ui.components.ThemeBackdrop
 import app.harmonic.music.ui.components.SleepTimerDialog
 import app.harmonic.music.ui.components.SleepTimerIcon
 import app.harmonic.music.ui.components.SourceLine
@@ -111,7 +111,7 @@ fun PlayerScreen(onClose: () -> Unit) {
     val (position, duration) = progress
 
     Box(Modifier.fillMaxSize()) {
-        RetroBackdrop(Modifier.fillMaxSize())
+        ThemeBackdrop(Modifier.fillMaxSize())
         Column(
             Modifier
                 .fillMaxSize()

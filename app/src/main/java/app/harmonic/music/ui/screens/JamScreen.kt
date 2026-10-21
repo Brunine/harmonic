@@ -4,11 +4,14 @@ import app.harmonic.music.R
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import android.bluetooth.BluetoothAdapter
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +36,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -62,6 +66,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,6 +75,10 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.harmonic.music.jam.JamManager
+import app.harmonic.music.jam.JamQr
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import app.harmonic.music.ui.LocalContainer
 import app.harmonic.music.ui.LocalUiActions
 import app.harmonic.music.ui.Routes
@@ -100,7 +110,7 @@ fun JamScreen() {
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when {
-                !state.active -> JamStart(state.error)
+                !state.active -> JamStart(state)
                 state.role == JamManager.Role.GUEST && !state.connected -> JamDiscovery(state)
                 else -> JamSession(state)
             }
@@ -110,8 +120,10 @@ fun JamScreen() {
 
 /** Before a Jam: pick a name, then host or join. Handles permissions and Bluetooth first. */
 @Composable
-private fun JamStart(error: String?) {
+private fun JamStart(state: JamManager.State) {
+    val error = state.error
     val c = LocalContainer.current
+    val actions = LocalUiActions.current
     val context = LocalContext.current
     val settings by c.settings.state.collectAsStateWithLifecycle()
     var name by rememberSaveable { mutableStateOf(settings.jamName) }
@@ -179,6 +191,38 @@ private fun JamStart(error: String?) {
             Spacer(Modifier.width(8.dp))
             Text(stringResource(R.string.jam_join))
         }
+        Spacer(Modifier.height(8.dp))
+        val invalidCode = stringResource(R.string.jam_qr_invalid)
+        OutlinedButton(
+            onClick = {
+                begin {
+                    scanJamCode(context, onCode = { c.jam.joinByCode(it) }, onInvalid = { actions.showMessage(invalidCode) })
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(Icons.Filled.QrCodeScanner, null)
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.jam_scan))
+        }
+        // A QR code scanned with the phone's camera, or a harmonic://jam link, opened the app.
+        state.invite?.let { code ->
+            Spacer(Modifier.height(16.dp))
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(stringResource(R.string.jam_invite_title, code), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(R.string.jam_invite_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { c.jam.setInvite(null) }) { Text(stringResource(R.string.cancel)) }
+                        TextButton(onClick = { begin { c.jam.joinByCode(code) } }) { Text(stringResource(R.string.join)) }
+                    }
+                }
+            }
+        }
         if (error != null) {
             Spacer(Modifier.height(16.dp))
             Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
@@ -222,6 +266,8 @@ private fun JamStart(error: String?) {
 @Composable
 private fun JamDiscovery(state: JamManager.State) {
     val jam = LocalContainer.current.jam
+    val actions = LocalUiActions.current
+    val context = LocalContext.current
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -231,10 +277,23 @@ private fun JamDiscovery(state: JamManager.State) {
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                stringResource(R.string.jam_looking_body),
+                if (state.joinCode != null) {
+                    stringResource(R.string.jam_looking_code, state.joinCode)
+                } else {
+                    stringResource(R.string.jam_looking_body)
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Spacer(Modifier.height(8.dp))
+            val invalidCode = stringResource(R.string.jam_qr_invalid)
+            OutlinedButton(onClick = {
+                scanJamCode(context, onCode = { jam.joinByCode(it) }, onInvalid = { actions.showMessage(invalidCode) })
+            }) {
+                Icon(Icons.Filled.QrCodeScanner, null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.jam_scan))
+            }
             Spacer(Modifier.height(16.dp))
         }
         itemsIndexed(state.hosts, key = { _, h -> h.endpointId }) { _, host ->
@@ -297,6 +356,10 @@ private fun JamSession(state: JamManager.State) {
                                 )
                             }
                         }
+                    }
+                    if (isHost && state.code != null) {
+                        Spacer(Modifier.height(12.dp))
+                        JamCode(state.code)
                     }
                     if (isHost) {
                         Spacer(Modifier.height(8.dp))
@@ -405,6 +468,42 @@ private fun JamSession(state: JamManager.State) {
             }
         }
     }
+}
+
+/** The host's QR code and code: friends scan it in Jam → Scan code. */
+@Composable
+private fun JamCode(code: String) {
+    val qr = remember(code) { JamQr.bitmap(code, 480).asImageBitmap() }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Image(
+            qr,
+            contentDescription = stringResource(R.string.jam_qr_description, code),
+            modifier = Modifier.size(132.dp).clip(RoundedCornerShape(12.dp)),
+        )
+        Spacer(Modifier.width(16.dp))
+        Column {
+            Text(stringResource(R.string.jam_code_label), style = MaterialTheme.typography.labelMedium)
+            Text(code, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.tertiary)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.jam_code_help),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** Google's code scanner: no camera permission needed, the scan screen is Google Play's. */
+private fun scanJamCode(context: Context, onCode: (String) -> Unit, onInvalid: () -> Unit) {
+    val options = GmsBarcodeScannerOptions.Builder()
+        .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+        .build()
+    GmsBarcodeScanning.getClient(context, options).startScan()
+        .addOnSuccessListener { barcode ->
+            val code = JamQr.parse(barcode.rawValue)
+            if (code != null) onCode(code) else onInvalid()
+        }
 }
 
 @Composable

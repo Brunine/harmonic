@@ -11,13 +11,43 @@ Every release bumps both numbers in `app/build.gradle.kts`:
 
 | Version | versionCode | Date | Status |
 |---|---|---|---|
-| 1.6.0 | 7 | 2026-10-21 | In testing |
+| 1.7.0 | 8 | 2026-10-21 | In testing |
+| 1.6.0 | 7 | 2026-10-21 | Released |
 | 1.5.0 | 6 | 2026-10-20 | Released |
 | 1.4.0 | 5 | 2026-10-20 | Released |
 | 1.3.0 | 4 | 2026-10-20 | Released |
 | 1.2.0 | 3 | 2026-10-20 | Released |
 | 1.1.0 | 2 | 2026-10-20 | Released |
 | 1.0.0 | 1 | 2026-10-19 | Released |
+
+## [1.7.0] - 2026-10-21
+
+### Added
+- **Four new designs** (Settings → Colours), each with its own colours, title font and player
+  backdrop, like Synthwave:
+  - **Cyber-Noir**: rain at night, black and white with one red neon; Bebas Neue titles.
+  - **Industrial / Neo-Gothic**: cathedral window and iron girders, crimson and old gold;
+    Cinzel titles.
+  - **Cyberpunk**: night city skyline, hazard yellow and cyan with magenta glitches; Chakra
+    Petch titles.
+  - **Matrixcore / Y2K**: green digital rain with chrome-mint highlights; Share Tech Mono
+    titles.
+  The backdrops are still pictures, drawn once: no battery cost.
+- **Plain titles** (Settings → Appearance): use the phone's normal font for titles instead of
+  the theme's display font.
+- **Jam QR codes**: the host's Jam screen shows a QR code and a 4-letter code. Guests tap
+  **Scan Jam code** and join that Jam directly, without picking it from a list. Scanning the QR
+  with the phone's camera app also opens Harmonic ready to join.
+- **Jam button in the car**: a QR button on Android Auto's player. With no Jam running it starts
+  one (if Jam was allowed on the phone before) and shows its QR code as the album art, so
+  passengers can scan it from the car screen. Press again to hide it; it also hides after 90
+  seconds. It shows in the notification too.
+
+### Notes
+- No database changes: updating from 1.6.0 keeps everything.
+- Guests on 1.6.0 or older can still join by picking the host from the list.
+- New libraries: ZXing core (draws QR codes) and Google's code scanner (scans them; no camera
+  permission, the scan screen comes from Google Play services).
 
 ## [1.6.0] - 2026-10-21
 
