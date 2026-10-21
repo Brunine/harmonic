@@ -10,6 +10,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
+import java.net.URLEncoder
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
@@ -66,6 +67,20 @@ sealed interface BrowseItem {
 
 data class AlbumTrack(val number: Int?, val track: Track)
 
+/** A playlist in the signed-in user's YouTube Music library. [id] "LM" is Liked music. */
+data class LibraryPlaylist(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val thumbnailUrl: String?,
+) {
+    val isLikedMusic: Boolean get() = id == LIKED_MUSIC_ID
+
+    companion object {
+        const val LIKED_MUSIC_ID = "LM"
+    }
+}
+
 data class AlbumPage(
     val browseId: String,
     val title: String,
@@ -95,6 +110,8 @@ data class AlbumPage(
 class YouTubeMusicBrowser(
     private val client: OkHttpClient,
     private val thumbnailPx: () -> Int,
+    /** For the signed-in library import; null disables it. */
+    private val account: AccountManager? = null,
 ) {
     private class Cached<T>(val value: T, val at: Long)
 
@@ -246,6 +263,115 @@ class YouTubeMusicBrowser(
     }
 
     // ---------------------------------------------------------------------------------------
+    // Radio
+    // ---------------------------------------------------------------------------------------
+
+    /**
+     * YouTube Music's song radio for [videoId] (the "RDAMVM" mix the YouTube Music app plays
+     * after a song): follows the song's genre and mood far better than YouTube's related
+     * videos. About 25-50 songs; the seed song itself is left out.
+     */
+    suspend fun radio(videoId: String): List<Track> = withContext(Dispatchers.IO) {
+        val json = post("next", JSONObject().apply {
+            put("videoId", videoId)
+            put("playlistId", "RDAMVM$videoId")
+            put("isAudioOnly", true)
+            put("enablePersistentPlaylistPanel", true)
+            put("tunerSettingValue", "AUTOMIX_SETTING_NORMAL")
+        })
+        val rows = ArrayList<JSONObject>()
+        // "counterpart" entries are the same songs as music videos: skip them.
+        findAllObjects(json, "playlistPanelVideoRenderer", rows, skip = setOf("counterpart"))
+        rows.mapNotNull(::panelTrack).filter { it.id != videoId }.distinctBy { it.id }
+    }
+
+    /** A queue row of a radio mix (playlistPanelVideoRenderer). */
+    private fun panelTrack(row: JSONObject): Track? {
+        val videoId = row.optString("videoId").takeIf { it.isNotEmpty() }
+            ?: row.optJSONObject("navigationEndpoint")?.optJSONObject("watchEndpoint")?.optString("videoId")
+                ?.takeIf { it.isNotEmpty() }
+            ?: return null
+        val title = row.optJSONObject("title")?.let(::runsText)?.takeIf { it.isNotBlank() } ?: return null
+        val byline = row.optJSONObject("longBylineText") ?: row.optJSONObject("shortBylineText")
+        val artist = byline?.let(::runsText)?.substringBefore(" • ")?.trim().orEmpty()
+        val artistId = byline?.let(::firstBrowseId)?.takeIf { it.startsWith("UC") }
+        val duration = row.optJSONObject("lengthText")?.let(::runsText)?.let(::parseDuration) ?: -1L
+        val isVideo = findString(row.optJSONObject("navigationEndpoint"), "musicVideoType") { true }
+            ?.let { it != "MUSIC_VIDEO_TYPE_ATV" } ?: false
+        return Track(
+            id = videoId,
+            title = title,
+            artist = artist,
+            durationSec = duration,
+            thumbnailUrl = row.optJSONObject("thumbnail")?.let(::thumbnailOf) ?: Thumbnails.fallback(videoId),
+            isVideo = isVideo,
+            artistId = artistId,
+        )
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // The signed-in user's library
+    // ---------------------------------------------------------------------------------------
+
+    /** Playlists saved in the user's YouTube Music library, Liked music first. */
+    suspend fun libraryPlaylists(): List<LibraryPlaylist> = withContext(Dispatchers.IO) {
+        val json = post("browse", JSONObject().put("browseId", "FEmusic_liked_playlists"), signedIn = true)
+        val cards = ArrayList<JSONObject>()
+        findAllObjects(json.optJSONObject("contents") ?: json, "musicTwoRowItemRenderer", cards)
+        val found = cards.mapNotNull { card ->
+            val browseId = card.optJSONObject("navigationEndpoint")?.optJSONObject("browseEndpoint")
+                ?.optString("browseId")?.takeIf { it.startsWith("VL") } ?: return@mapNotNull null
+            LibraryPlaylist(
+                id = browseId.removePrefix("VL"),
+                title = card.optJSONObject("title")?.let(::runsText).orEmpty(),
+                subtitle = card.optJSONObject("subtitle")?.let(::runsText).orEmpty(),
+                thumbnailUrl = card.optJSONObject("thumbnailRenderer")?.let(::thumbnailOf),
+            )
+        }.distinctBy { it.id }
+        val liked = found.firstOrNull { it.isLikedMusic }
+            ?: LibraryPlaylist(LibraryPlaylist.LIKED_MUSIC_ID, "", "", null)
+        listOf(liked) + found.filter { !it.isLikedMusic }
+    }
+
+    /**
+     * Every song of a playlist in the user's library (following "load more" pages), up to
+     * [max]. Works for private playlists and Liked music because the request is signed in.
+     */
+    suspend fun libraryPlaylistTracks(
+        playlistId: String,
+        max: Int = 5000,
+        onProgress: (Int) -> Unit = {},
+    ): List<Track> = withContext(Dispatchers.IO) {
+        val tracks = LinkedHashMap<String, Track>()
+        val first = post("browse", JSONObject().put("browseId", "VL$playlistId"), signedIn = true)
+        // Only the playlist's own list, not suggestion shelves below it.
+        var page: JSONObject = findObject(first, "musicPlaylistShelfRenderer")
+            ?: findObject(first.optJSONObject("contents"), "musicShelfRenderer")
+            ?: first
+        var pages = 0
+        while (true) {
+            val rows = ArrayList<JSONObject>()
+            findAllObjects(page, "musicResponsiveListItemRenderer", rows)
+            rows.forEach { row -> listItemTrack(row, "", null)?.track?.let { tracks.putIfAbsent(it.id, it) } }
+            onProgress(tracks.size)
+            if (tracks.size >= max || ++pages >= MAX_PAGES) break
+
+            // Newer layout: a continuation command; older layout: nextContinuationData.
+            val command = findObject(page, "continuationCommand")?.optString("token")?.takeIf { it.isNotEmpty() }
+            val legacy = findObject(page, "nextContinuationData")?.optString("continuation")?.takeIf { it.isNotEmpty() }
+            page = when {
+                command != null -> post("browse", JSONObject().put("continuation", command), signedIn = true)
+                legacy != null -> {
+                    val token = URLEncoder.encode(legacy, "UTF-8")
+                    post("browse", JSONObject(), signedIn = true, query = "&ctoken=$token&continuation=$token&type=next")
+                }
+                else -> break
+            }
+        }
+        tracks.values.take(max)
+    }
+
+    // ---------------------------------------------------------------------------------------
     // Parsing helpers
     // ---------------------------------------------------------------------------------------
 
@@ -362,27 +488,34 @@ class YouTubeMusicBrowser(
     // Network
     // ---------------------------------------------------------------------------------------
 
-    private fun browse(browseId: String): JSONObject {
+    private fun browse(browseId: String): JSONObject = post("browse", JSONObject().put("browseId", browseId))
+
+    /**
+     * One InnerTube request. With [signedIn], the user's YouTube cookies go along (their own
+     * library); otherwise the request is anonymous.
+     */
+    private fun post(endpoint: String, body: JSONObject, signedIn: Boolean = false, query: String = ""): JSONObject {
         val locale = Locale.getDefault()
-        val body = JSONObject().apply {
-            put("context", JSONObject().put("client", JSONObject().apply {
-                put("clientName", CLIENT_NAME)
-                put("clientVersion", CLIENT_VERSION)
-                // YouTube translates section titles ("Top songs", "Albums") into this language.
-                put("hl", locale.language.ifEmpty { "en" })
-                put("gl", locale.country.ifEmpty { "US" })
-            }))
-            put("browseId", browseId)
-        }
-        val request = Request.Builder()
-            .url("$ORIGIN/youtubei/v1/browse?prettyPrint=false")
+        body.put("context", JSONObject().put("client", JSONObject().apply {
+            put("clientName", CLIENT_NAME)
+            put("clientVersion", CLIENT_VERSION)
+            // YouTube translates section titles ("Top songs", "Albums") into this language.
+            put("hl", locale.language.ifEmpty { "en" })
+            put("gl", locale.country.ifEmpty { "US" })
+        }))
+        val builder = Request.Builder()
+            .url("$ORIGIN/youtubei/v1/$endpoint?prettyPrint=false$query")
             .post(body.toString().toRequestBody(JSON))
             .header("User-Agent", USER_AGENT)
             .header("Origin", ORIGIN)
             .header("Referer", "$ORIGIN/")
             .header("X-YouTube-Client-Name", CLIENT_ID)
             .header("X-YouTube-Client-Version", CLIENT_VERSION)
-            .build()
+        if (signedIn) {
+            val auth = account?.authHeaders(ORIGIN) ?: throw IOException("Not signed in")
+            auth.forEach { (k, v) -> builder.header(k, v) }
+        }
+        val request = builder.build()
         return client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw IOException("YouTube Music returned HTTP ${response.code}")
             JSONObject(response.body?.string() ?: throw IOException("Empty response"))
@@ -401,6 +534,8 @@ class YouTubeMusicBrowser(
         private const val USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
         private const val CACHE_MS = 30 * 60 * 1000L
+        /** Library pages hold about 100 songs each. */
+        private const val MAX_PAGES = 60
         private val JSON = "application/json".toMediaType()
         private val YEAR = Regex("\\b(19|20)\\d{2}\\b")
 
@@ -417,18 +552,27 @@ class YouTubeMusicBrowser(
             return null
         }
 
-        /** Every object stored under [key], without looking inside the ones found. */
-        internal fun findAllObjects(node: Any?, key: String, out: MutableList<JSONObject>) {
+        /**
+         * Every object stored under [key], without looking inside the ones found, nor under
+         * any of the [skip] keys.
+         */
+        internal fun findAllObjects(
+            node: Any?,
+            key: String,
+            out: MutableList<JSONObject>,
+            skip: Set<String> = emptySet(),
+        ) {
             when (node) {
                 is JSONObject -> {
                     val names = node.keys()
                     while (names.hasNext()) {
                         val name = names.next()
+                        if (name in skip) continue
                         val value = node.opt(name)
-                        if (name == key && value is JSONObject) out += value else findAllObjects(value, key, out)
+                        if (name == key && value is JSONObject) out += value else findAllObjects(value, key, out, skip)
                     }
                 }
-                is JSONArray -> for (i in 0 until node.length()) findAllObjects(node.opt(i), key, out)
+                is JSONArray -> for (i in 0 until node.length()) findAllObjects(node.opt(i), key, out, skip)
             }
         }
 

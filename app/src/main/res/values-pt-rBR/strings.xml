@@ -24,6 +24,8 @@
     <string name="audio_offload">Processamento de áudio dedicado</string>
     <string name="audio_offload_desc">Deixa o chip de áudio decodificar com a tela desligada. Desligue se ouvir falhas</string>
     <string name="audio_quality">Qualidade do áudio</string>
+    <string name="auto_check_updates">Procurar automaticamente</string>
+    <string name="auto_check_updates_desc">Uma vez por dia, alguns kilobytes</string>
     <string name="auto_download_liked">Baixar músicas curtidas</string>
     <string name="auto_download_liked_desc">No Wi-Fi, as músicas que você curte são baixadas sozinhas para ouvir offline</string>
     <string name="auto_downloads">Downloads</string>
@@ -50,6 +52,9 @@
     <string name="cancel">Cancelar</string>
     <string name="cancel_download">Cancelar download (%1$d%%)</string>
     <string name="check_connection">Verifique sua conexão com a internet e tente de novo.</string>
+    <string name="check_updates">Procurar atualizações</string>
+    <string name="check_updates_desc">Procura uma versão mais nova no GitHub</string>
+    <string name="checking_updates">Procurando…</string>
     <string name="clear">Limpar</string>
     <string name="clear_all">Limpar tudo</string>
     <string name="clear_cache">Limpar cache de streaming</string>
@@ -144,6 +149,8 @@
     <string name="join">Entrar</string>
     <string name="like">Curtir</string>
     <string name="liked">Curtidas</string>
+    <string name="liked_music">Músicas curtidas</string>
+    <string name="liked_music_desc">Entram nas suas curtidas do Harmonic</string>
     <string name="link_is_song">Esse link é de uma música, não de uma playlist</string>
     <string name="load">Carregar</string>
     <string name="load_failed">Não foi possível carregar</string>
@@ -248,7 +255,7 @@
     <string name="share">Compartilhar</string>
     <string name="shuffle">Aleatório</string>
     <string name="sign_in">Entrar com o Google</string>
-    <string name="sign_in_desc">Opcional. Só é necessário para faixas com restrição de idade</string>
+    <string name="sign_in_desc">Opcional. Toca faixas com restrição de idade e importa sua biblioteca do YouTube Music</string>
     <string name="sign_in_title">Entrar</string>
     <string name="sign_out">Sair da conta</string>
     <string name="sign_out_desc">Conectado. Usado só para faixas com restrição de idade</string>
@@ -278,11 +285,22 @@
     <string name="turn_on">Ligar</string>
     <string name="unlike">Remover das curtidas</string>
     <string name="unsupported_link">Link não suportado</string>
+    <string name="up_to_date">Você tem a versão mais recente (%1$s)</string>
+    <string name="update_available">Harmonic %1$s disponível</string>
+    <string name="update_check_failed">Não foi possível procurar atualizações</string>
+    <string name="update_download">Baixar</string>
+    <string name="update_how">Baixar abre o APK no navegador. Abra o arquivo baixado para instalar por cima desta versão; sua biblioteca é mantida.</string>
+    <string name="update_later">Depois</string>
     <string name="widget_description">Capa, música e botões de reprodução</string>
     <string name="widget_idle">Toque para começar a ouvir</string>
     <string name="widget_name">Player do Harmonic</string>
     <string name="wifi_only_downloads">Baixar só no Wi-Fi</string>
     <string name="wifi_only_downloads_desc">Os downloads na fila esperam uma rede sem limite de dados</string>
+    <string name="yt_import_nothing">Nada para importar</string>
+    <string name="yt_library_body">As músicas curtidas viram curtidas no Harmonic. Cada playlist vira uma playlist do Harmonic com o mesmo nome; importar de novo atualiza ela.</string>
+    <string name="yt_library_desc">Suas músicas curtidas e playlists</string>
+    <string name="yt_library_importing">Importando %1$d de %2$d: %3$s (%4$d músicas)</string>
+    <string name="yt_library_title">Importar do YouTube Music</string>
     <plurals name="add_songs_to_playlist">
         <item quantity="one">Adicionar à playlist</item>
         <item quantity="many">Adicionar %d músicas à playlist</item>
@@ -352,5 +370,25 @@
         <item quantity="one">A seguir • %d música</item>
         <item quantity="many">A seguir • %d músicas</item>
         <item quantity="other">A seguir • %d músicas</item>
+    </plurals>
+    <plurals name="yt_import_button">
+        <item quantity="one">Importar %d</item>
+        <item quantity="many">Importar %d</item>
+        <item quantity="other">Importar %d</item>
+    </plurals>
+    <plurals name="yt_import_failed">
+        <item quantity="one">%d não pôde ser importada</item>
+        <item quantity="many">%d não puderam ser importadas</item>
+        <item quantity="other">%d não puderam ser importadas</item>
+    </plurals>
+    <plurals name="yt_imported_likes">
+        <item quantity="one">%d nova curtida</item>
+        <item quantity="many">%d novas curtidas</item>
+        <item quantity="other">%d novas curtidas</item>
+    </plurals>
+    <plurals name="yt_imported_playlists">
+        <item quantity="one">%d playlist importada</item>
+        <item quantity="many">%d playlists importadas</item>
+        <item quantity="other">%d playlists importadas</item>
     </plurals>
 </resources>

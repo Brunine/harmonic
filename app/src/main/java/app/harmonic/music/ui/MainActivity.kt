@@ -62,7 +62,9 @@ import app.harmonic.music.container
 import app.harmonic.music.data.model.Track
 import app.harmonic.music.ui.components.AddToPlaylistDialog
 import app.harmonic.music.ui.components.MiniPlayer
+import app.harmonic.music.ui.components.UpdateDialog
 import app.harmonic.music.ui.components.TrackMenuSheet
+import app.harmonic.music.ui.screens.AccountLibraryScreen
 import app.harmonic.music.ui.screens.AlbumScreen
 import app.harmonic.music.ui.screens.ArtistScreen
 import app.harmonic.music.ui.screens.HomeScreen
@@ -182,6 +184,10 @@ fun HarmonicRoot(container: AppContainer, sharedText: MutableStateFlow<String?>)
         container.playerConnection.messages.collect { actions.showMessage(it) }
     }
 
+    // Once a day: is there a newer Harmonic on GitHub?
+    LaunchedEffect(Unit) { container.updates.checkDaily() }
+    val update by container.updates.available.collectAsStateWithLifecycle()
+
     // Handle links shared into the app: playlists open, single videos play right away.
     val shared by sharedText.collectAsStateWithLifecycle()
     LaunchedEffect(shared) {
@@ -270,6 +276,7 @@ fun HarmonicRoot(container: AppContainer, sharedText: MutableStateFlow<String?>)
                 composable(Routes.SETTINGS) { SettingsScreen(onBack = { nav.popBackStack() }) }
                 composable(Routes.PLAYER) { PlayerScreen(onClose = { nav.popBackStack() }) }
                 composable(Routes.LOGIN) { LoginScreen(onDone = { nav.popBackStack() }) }
+                composable(Routes.ACCOUNT_LIBRARY) { AccountLibraryScreen(onBack = { nav.popBackStack() }) }
                 composable(
                     Routes.PLAYLIST,
                     arguments = listOf(navArgument("id") { type = NavType.LongType }),
@@ -302,6 +309,9 @@ fun HarmonicRoot(container: AppContainer, sharedText: MutableStateFlow<String?>)
         }
         addToPlaylist?.let { tracks ->
             AddToPlaylistDialog(tracks, onDismiss = { addToPlaylist = null })
+        }
+        update?.let { u ->
+            UpdateDialog(u, onLater = { container.updates.dismiss(u) }, onClose = { container.updates.dismiss(u) })
         }
     }
 }

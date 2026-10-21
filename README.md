@@ -18,7 +18,10 @@ Inspired by InnerTune, OuterTune and YMusic.
   playlist or album by link, or save one from search.
 - **No ads**: streams are fetched directly, so ads are never requested. Optional SponsorBlock
   skips non-music intros/outros and sponsor segments inside music videos.
-- **Optional Google sign-in**: only used to play age-restricted tracks.
+- **Optional Google sign-in**: plays age-restricted tracks and imports your YouTube Music liked
+  songs and playlists.
+- **Radio** from YouTube Music's song radio, without repeating other versions of the same song.
+- **Updates**: "Check for updates" finds new versions published as GitHub Releases.
 - **More sources**: search SoundCloud, Deezer and Apple Music too. Every result is labelled with
   its source. SoundCloud streams directly; Deezer and Apple Music audio is DRM-protected, so
   those songs play using the matching YouTube Music track (matched by title, artist and length,
@@ -38,6 +41,12 @@ Inspired by InnerTune, OuterTune and YMusic.
   from the current song's cover, and a pure black mode for OLED screens.
 - **Share to app**: share a YouTube, YouTube Music, SoundCloud, Deezer or Apple Music link to
   Harmonic to play it or open the playlist / album.
+
+## Publishing a release
+
+Pushing a tag like `v1.6.0` builds the signed APK and publishes it as a GitHub Release, with the
+version's CHANGELOG.md section as notes. The app's "Check for updates" reads these Releases from
+the repository set in `UPDATE_REPO` (app/build.gradle.kts), which must be public.
 
 ## Building the APK
 

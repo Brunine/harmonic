@@ -11,12 +11,41 @@ Every release bumps both numbers in `app/build.gradle.kts`:
 
 | Version | versionCode | Date | Status |
 |---|---|---|---|
-| 1.5.0 | 6 | 2026-10-20 | In testing |
+| 1.6.0 | 7 | 2026-10-21 | In testing |
+| 1.5.0 | 6 | 2026-10-20 | Released |
 | 1.4.0 | 5 | 2026-10-20 | Released |
 | 1.3.0 | 4 | 2026-10-20 | Released |
 | 1.2.0 | 3 | 2026-10-20 | Released |
 | 1.1.0 | 2 | 2026-10-20 | Released |
 | 1.0.0 | 1 | 2026-10-19 | Released |
+
+## [1.6.0] - 2026-10-21
+
+### Added
+- **Import from YouTube Music** (Settings → Account, when signed in): pick your Liked music and
+  any playlists from your YouTube Music library. Liked music becomes likes in Harmonic; each
+  playlist becomes a Harmonic playlist with the same name, and importing again updates it.
+- **GitHub Releases**: pushing a version tag (`v1.6.0`) now also publishes a Release on GitHub
+  with the signed APK (`harmonic-1.6.0.apk`) and this changelog section as its notes.
+- **Check for updates** (Settings → About): looks for a newer Release on GitHub and offers to
+  download it. Also checks by itself once a day (a few kilobytes; can be turned off). The APK
+  downloads in the browser; opening it installs the update over the current version.
+
+### Changed
+- **Radio follows the music**: autoplay, "Start radio" and Quick picks now use YouTube Music's
+  own song radio, which stays close to the song's genre and mood, instead of YouTube's related
+  videos.
+
+### Fixed
+- **Android Auto queue jumping to the top**: the queue no longer reloads every time a song
+  finishes loading, so it can be scrolled all the way through.
+- **Same song in different versions**: radio and recommendations skip other versions of songs
+  already in the queue (acoustic, live, radio edit, remix, remaster, music video...).
+
+### Notes
+- No database changes: updating from 1.5.0 keeps everything.
+- "Check for updates" needs the GitHub repository to be public, and finds versions published
+  from 1.6.0 on.
 
 ## [1.5.0] - 2026-10-20
 

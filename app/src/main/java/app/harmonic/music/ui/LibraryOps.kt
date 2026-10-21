@@ -34,6 +34,38 @@ suspend fun AppContainer.addToPlaylist(playlistId: Long, tracks: List<Track>) = 
     db.playlistDao().append(playlistId, tracks.map { it.id })
 }
 
+/**
+ * Saves [tracks] as the local playlist [name]. A playlist with that name is refreshed instead
+ * of duplicated, so importing again updates it.
+ */
+suspend fun AppContainer.saveOrReplacePlaylist(name: String, tracks: List<Track>, sourceUrl: String?): Long =
+    withContext(Dispatchers.IO) {
+        val existing = db.playlistDao().findByName(name)
+        if (existing == null) {
+            createPlaylist(name, tracks, sourceUrl)
+        } else {
+            db.playlistDao().clearEntries(existing.id)
+            addToPlaylist(existing.id, tracks)
+            existing.id
+        }
+    }
+
+/** Likes every song in [tracks] (newest first). Returns how many weren't liked yet. */
+suspend fun AppContainer.likeAll(tracks: List<Track>): Int = withContext(Dispatchers.IO) {
+    val dao = db.songDao()
+    dao.upsertAll(tracks)
+    val now = System.currentTimeMillis()
+    var added = 0
+    tracks.forEachIndexed { i, track ->
+        if (dao.get(track.id)?.liked != true) {
+            // Keep YouTube's order: the first song is the most recently liked.
+            dao.setLiked(track.id, true, now - i)
+            added++
+        }
+    }
+    added
+}
+
 /** Copies a playlist or album from any supported service into the local library. */
 suspend fun AppContainer.importPlaylist(url: String): Pair<Long, Int> {
     val collectionUrl = when (val target = catalog.resolveLink(url)) {

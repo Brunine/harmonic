@@ -25,6 +25,8 @@
     <string name="audio_offload">Audio offload</string>
     <string name="audio_offload_desc">Lets the phone\'s audio chip decode with the screen off. Turn off if you hear glitches</string>
     <string name="audio_quality">Audio quality</string>
+    <string name="auto_check_updates">Check automatically</string>
+    <string name="auto_check_updates_desc">Once a day, a few kilobytes</string>
     <string name="auto_download_liked">Download liked songs</string>
     <string name="auto_download_liked_desc">On Wi-Fi, songs you like are saved for offline listening by themselves</string>
     <string name="auto_downloads">Downloads</string>
@@ -51,6 +53,9 @@
     <string name="cancel">Cancel</string>
     <string name="cancel_download">Cancel download (%1$d%%)</string>
     <string name="check_connection">Check your internet connection and try again.</string>
+    <string name="check_updates">Check for updates</string>
+    <string name="check_updates_desc">Looks for a newer version on GitHub</string>
+    <string name="checking_updates">Checking…</string>
     <string name="clear">Clear</string>
     <string name="clear_all">Clear all</string>
     <string name="clear_cache">Clear streaming cache</string>
@@ -145,6 +150,8 @@
     <string name="join">Join</string>
     <string name="like">Like</string>
     <string name="liked">Liked</string>
+    <string name="liked_music">Liked music</string>
+    <string name="liked_music_desc">Added to your likes in Harmonic</string>
     <string name="link_is_song">That\'s a link to a single song, not a playlist</string>
     <string name="load">Load</string>
     <string name="load_failed">Couldn\'t load</string>
@@ -249,7 +256,7 @@
     <string name="share">Share</string>
     <string name="shuffle">Shuffle</string>
     <string name="sign_in">Sign in with Google</string>
-    <string name="sign_in_desc">Optional. Only needed to play age-restricted tracks</string>
+    <string name="sign_in_desc">Optional. Plays age-restricted tracks and imports your YouTube Music library</string>
     <string name="sign_in_title">Sign in</string>
     <string name="sign_out">Sign out</string>
     <string name="sign_out_desc">Signed in. Used only for age-restricted tracks</string>
@@ -279,11 +286,22 @@
     <string name="turn_on">Turn on</string>
     <string name="unlike">Remove from liked</string>
     <string name="unsupported_link">Unsupported link</string>
+    <string name="up_to_date">You have the latest version (%1$s)</string>
+    <string name="update_available">Harmonic %1$s is available</string>
+    <string name="update_check_failed">Couldn\'t check for updates</string>
+    <string name="update_download">Download</string>
+    <string name="update_how">Download opens the APK in your browser. Open the downloaded file to install it over this version; your library is kept.</string>
+    <string name="update_later">Later</string>
     <string name="widget_description">Cover, song and playback buttons</string>
     <string name="widget_idle">Tap to start listening</string>
     <string name="widget_name">Harmonic player</string>
     <string name="wifi_only_downloads">Download only on Wi-Fi</string>
     <string name="wifi_only_downloads_desc">Queued downloads wait for an unmetered network</string>
+    <string name="yt_import_nothing">Nothing to import</string>
+    <string name="yt_library_body">Liked music becomes likes in Harmonic. Each playlist becomes a Harmonic playlist with the same name; importing again updates it.</string>
+    <string name="yt_library_desc">Your liked songs and playlists</string>
+    <string name="yt_library_importing">Importing %1$d of %2$d: %3$s (%4$d songs)</string>
+    <string name="yt_library_title">Import from YouTube Music</string>
     <plurals name="add_songs_to_playlist">
         <item quantity="one">Add to playlist</item>
         <item quantity="other">Add %d songs to playlist</item>
@@ -339,5 +357,21 @@
     <plurals name="up_next">
         <item quantity="one">Up next • %d song</item>
         <item quantity="other">Up next • %d songs</item>
+    </plurals>
+    <plurals name="yt_import_button">
+        <item quantity="one">Import %d</item>
+        <item quantity="other">Import %d</item>
+    </plurals>
+    <plurals name="yt_import_failed">
+        <item quantity="one">%d couldn\'t be imported</item>
+        <item quantity="other">%d couldn\'t be imported</item>
+    </plurals>
+    <plurals name="yt_imported_likes">
+        <item quantity="one">%d new like</item>
+        <item quantity="other">%d new likes</item>
+    </plurals>
+    <plurals name="yt_imported_playlists">
+        <item quantity="one">%d playlist imported</item>
+        <item quantity="other">%d playlists imported</item>
     </plurals>
 </resources>
