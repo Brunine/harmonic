@@ -11,6 +11,8 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -36,6 +38,7 @@ fun HarmonicTheme(
     palette: ThemePalette,
     pureBlack: Boolean,
     albumSeed: Int?,
+    systemFont: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val dark = isDarkTheme(mode)
@@ -44,6 +47,9 @@ fun HarmonicTheme(
 
     val scheme = when (palette) {
         ThemePalette.SYNTHWAVE -> synthwaveScheme(dark, black)
+        ThemePalette.CYBER_NOIR, ThemePalette.NEO_GOTHIC, ThemePalette.CYBERPUNK, ThemePalette.MATRIX ->
+            // These designs are made for the dark; in light mode they keep their key colour.
+            if (dark) designScheme(palette.design, black)!! else seededScheme(palette.seed!!.toInt(), false, false, mono = false)
         ThemePalette.WALLPAPER ->
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val s = if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -57,7 +63,11 @@ fun HarmonicTheme(
 
     // Album colours change with every song: fade the key colours instead of flashing.
     val animated = if (palette == ThemePalette.ALBUM) scheme.animated() else scheme
-    MaterialTheme(colorScheme = animated, typography = HarmonicTypography, content = content)
+    val design = palette.design
+    val typography = remember(design, systemFont) { typographyFor(design, systemFont) }
+    CompositionLocalProvider(LocalDesign provides design) {
+        MaterialTheme(colorScheme = animated, typography = typography, content = content)
+    }
 }
 
 /**

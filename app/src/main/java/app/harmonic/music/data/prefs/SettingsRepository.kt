@@ -38,9 +38,16 @@ enum class ThemeMode(@StringRes val label: Int) {
     DARK(R.string.theme_dark),
 }
 
-/** Colour palettes. [seed] is the key colour the whole scheme is derived from. */
-enum class ThemePalette(@StringRes val label: Int, val seed: Long?) {
-    SYNTHWAVE(R.string.palette_synthwave, 0xFFFF2E97),
+/**
+ * Colour palettes. [seed] is the key colour the whole scheme is derived from. The first five
+ * are full designs, each with its own colours, title font and player backdrop.
+ */
+enum class ThemePalette(@StringRes val label: Int, val seed: Long?, val isDesign: Boolean = false) {
+    SYNTHWAVE(R.string.palette_synthwave, 0xFFFF2E97, isDesign = true),
+    CYBER_NOIR(R.string.palette_cyber_noir, 0xFFE0263A, isDesign = true),
+    NEO_GOTHIC(R.string.palette_neo_gothic, 0xFFB0213A, isDesign = true),
+    CYBERPUNK(R.string.palette_cyberpunk, 0xFFFCEE0A, isDesign = true),
+    MATRIX(R.string.palette_matrix, 0xFF00FF41, isDesign = true),
     WALLPAPER(R.string.palette_wallpaper, null),
     ALBUM(R.string.palette_album, null),
     EMBER(R.string.palette_ember, 0xFFFF6B4A),
@@ -80,6 +87,8 @@ data class AppSettings(
     val autoDownloadLiked: Boolean = false,
     /** Look for a new Harmonic version once a day. */
     val checkUpdates: Boolean = true,
+    /** Titles in the system font instead of the theme's display font. */
+    val systemFont: Boolean = false,
 )
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
@@ -110,6 +119,7 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         val normalizeVolume = booleanPreferencesKey("normalize_volume")
         val autoDownloadLiked = booleanPreferencesKey("auto_download_liked")
         val checkUpdates = booleanPreferencesKey("check_updates")
+        val systemFont = booleanPreferencesKey("system_font")
     }
 
     private fun Preferences.toSettings(): AppSettings {
@@ -141,6 +151,7 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
             normalizeVolume = this[Keys.normalizeVolume] ?: d.normalizeVolume,
             autoDownloadLiked = this[Keys.autoDownloadLiked] ?: d.autoDownloadLiked,
             checkUpdates = this[Keys.checkUpdates] ?: d.checkUpdates,
+            systemFont = this[Keys.systemFont] ?: d.systemFont,
         )
     }
 
@@ -197,6 +208,7 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
     suspend fun setOnNavigation(v: InterruptAction) = store.edit { it[Keys.onNavigation] = v.name }
     suspend fun setOnOtherMusic(v: InterruptAction) = store.edit { it[Keys.onOtherMusic] = v.name }
     suspend fun setResumeAfterInterruption(v: Boolean) = store.edit { it[Keys.resumeAfterInterruption] = v }
+    suspend fun setSystemFont(v: Boolean) = store.edit { it[Keys.systemFont] = v }
     suspend fun setCheckUpdates(v: Boolean) = store.edit { it[Keys.checkUpdates] = v }
     suspend fun setAutoDownloadLiked(v: Boolean) = store.edit { it[Keys.autoDownloadLiked] = v }
     suspend fun setNormalizeVolume(v: Boolean) = store.edit { it[Keys.normalizeVolume] = v }

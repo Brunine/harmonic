@@ -84,6 +84,7 @@ import app.harmonic.music.data.remote.CatalogRepository
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import app.harmonic.music.jam.JamQr
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -117,7 +118,7 @@ class MainActivity : ComponentActivity() {
                     },
                 )
             }
-            HarmonicTheme(settings.themeMode, settings.palette, settings.pureBlack, albumSeed) {
+            HarmonicTheme(settings.themeMode, settings.palette, settings.pureBlack, albumSeed, settings.systemFont) {
                 HarmonicRoot(container, sharedText)
             }
         }
@@ -129,8 +130,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
-        if (intent?.action == Intent.ACTION_SEND) {
-            sharedText.value = intent.getStringExtra(Intent.EXTRA_TEXT)
+        when (intent?.action) {
+            Intent.ACTION_SEND -> sharedText.value = intent.getStringExtra(Intent.EXTRA_TEXT)
+            // A Jam QR code scanned with the camera app: harmonic://jam/K7QX
+            Intent.ACTION_VIEW -> JamQr.parse(intent.dataString)?.let { container.jam.setInvite(it) }
         }
     }
 
@@ -182,6 +185,12 @@ fun HarmonicRoot(container: AppContainer, sharedText: MutableStateFlow<String?>)
 
     LaunchedEffect(Unit) {
         container.playerConnection.messages.collect { actions.showMessage(it) }
+    }
+
+    // A Jam invite (QR code / link) opens the Jam tab, where joining is one tap.
+    val jamInvite = container.jam.state.collectAsStateWithLifecycle().value.invite
+    LaunchedEffect(jamInvite) {
+        if (jamInvite != null) nav.navigate(Routes.JAM) { launchSingleTop = true }
     }
 
     // Once a day: is there a newer Harmonic on GitHub?

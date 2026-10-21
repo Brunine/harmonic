@@ -68,7 +68,8 @@ class JamManager(private val context: Context, private val app: AppContainer) {
     enum class Role { NONE, HOST, GUEST }
 
     data class Member(val endpointId: String, val name: String)
-    data class FoundHost(val endpointId: String, val name: String)
+    /** [code] is the host's Jam code, when it advertises one (Harmonic 1.7.0 and later). */
+    data class FoundHost(val endpointId: String, val name: String, val code: String? = null)
 
     data class State(
         val role: Role = Role.NONE,
@@ -89,6 +90,12 @@ class JamManager(private val context: Context, private val app: AppContainer) {
         val playEverywhere: Boolean = false,
         val guestsCanControl: Boolean = true,
         val error: String? = null,
+        /** Host: this Jam's code, shown as a QR code for guests to scan. */
+        val code: String? = null,
+        /** Guest: join the host with this code as soon as it is found. */
+        val joinCode: String? = null,
+        /** Not in a Jam yet: a code from a scanned QR / opened link, waiting for the user's OK. */
+        val invite: String? = null,
     ) {
         val current: Track? get() = queue.getOrNull(currentIndex - queueOffset)
         val active: Boolean get() = role != Role.NONE
@@ -129,14 +136,16 @@ class JamManager(private val context: Context, private val app: AppContainer) {
 
     fun startHosting() {
         if (_state.value.active) return
-        _state.value = State(role = Role.HOST, hostName = myName, connected = true)
+        val code = JamQr.newCode()
+        _state.value = State(role = Role.HOST, hostName = myName, connected = true, code = code)
         connectController {
             val options = AdvertisingOptions.Builder()
                 .setStrategy(STRATEGY)
                 // Never drop the phone's current Wi-Fi (e.g. wireless Android Auto) to upgrade.
                 .setConnectionType(ConnectionType.NON_DISRUPTIVE)
                 .build()
-            client.startAdvertising(myName, SERVICE_ID, hostLifecycle, options)
+            // The code rides along in the advertised name so guests can find this host by it.
+            client.startAdvertising("$myName$CODE_SEPARATOR$code", SERVICE_ID, hostLifecycle, options)
                 .addOnFailureListener { fail(it) }
             scheduleBroadcast()
             startTicking()
@@ -333,9 +342,9 @@ class JamManager(private val context: Context, private val app: AppContainer) {
     // Joining
     // ---------------------------------------------------------------------------------------
 
-    fun startSearching() {
+    fun startSearching(joinCode: String? = null) {
         if (_state.value.active) return
-        _state.value = State(role = Role.GUEST, searching = true)
+        _state.value = State(role = Role.GUEST, searching = true, joinCode = joinCode)
         val options = DiscoveryOptions.Builder().setStrategy(STRATEGY).build()
         client.startDiscovery(SERVICE_ID, discoveryCallback, options)
             .addOnFailureListener { fail(it) }
@@ -344,14 +353,55 @@ class JamManager(private val context: Context, private val app: AppContainer) {
     private val discoveryCallback = object : EndpointDiscoveryCallback() {
         override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
             if (info.serviceId != SERVICE_ID) return
-            _state.update { s ->
-                s.copy(hosts = s.hosts.filter { it.endpointId != endpointId } + FoundHost(endpointId, info.endpointName))
-            }
+            val host = parseHost(endpointId, info.endpointName)
+            _state.update { s -> s.copy(hosts = s.hosts.filter { it.endpointId != endpointId } + host) }
+            joinIfWanted()
         }
 
         override fun onEndpointLost(endpointId: String) {
             _state.update { s -> s.copy(hosts = s.hosts.filter { it.endpointId != endpointId }) }
         }
+    }
+
+    /**
+     * True when a Jam can start right away, without asking anything: permissions were granted
+     * before and Bluetooth is on. Used by the car's Jam button, where nothing can be asked.
+     */
+    fun canStartWithoutAsking(): Boolean =
+        requiredPermissions().all { ContextCompat.checkSelfPermission(context, it) == android.content.pm.PackageManager.PERMISSION_GRANTED } &&
+            isBluetoothOn(context)
+
+    /** Joins the Jam with [code] (from a QR code): searches, then connects when it's found. */
+    fun joinByCode(code: String) {
+        val s = _state.value
+        when {
+            !s.active -> startSearching(joinCode = code)
+            s.role == Role.GUEST && hostEndpoint == null -> {
+                _state.update { it.copy(joinCode = code, error = null) }
+                joinIfWanted()
+            }
+        }
+        _state.update { it.copy(invite = null) }
+    }
+
+    /** A code from a scanned QR code or an opened harmonic://jam link, before joining. */
+    fun setInvite(code: String?) {
+        if (_state.value.active) return
+        _state.update { it.copy(invite = code) }
+    }
+
+    private fun joinIfWanted() {
+        val s = _state.value
+        val code = s.joinCode ?: return
+        if (hostEndpoint != null || s.connectingTo != null) return
+        s.hosts.firstOrNull { it.code == code }?.let { join(it) }
+    }
+
+    private fun parseHost(endpointId: String, endpointName: String): FoundHost {
+        val i = endpointName.lastIndexOf(CODE_SEPARATOR)
+        val code = if (i >= 0) JamQr.parse(endpointName.substring(i + CODE_SEPARATOR.length)) else null
+        val name = if (code != null) endpointName.substring(0, i) else endpointName
+        return FoundHost(endpointId, name, code)
     }
 
     fun join(host: FoundHost) {
@@ -661,6 +711,8 @@ class JamManager(private val context: Context, private val app: AppContainer) {
 
     companion object {
         private const val SERVICE_ID = "app.harmonic.music.jam"
+        /** Between the host's name and its Jam code in the advertised name: "Bruno #K7QX". */
+        private const val CODE_SEPARATOR = " #"
         private val STRATEGY = Strategy.P2P_STAR
 
         /** Runtime permissions Nearby Connections needs on this Android version. */

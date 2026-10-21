@@ -26,8 +26,11 @@ Inspired by InnerTune, OuterTune and YMusic.
   its source. SoundCloud streams directly; Deezer and Apple Music audio is DRM-protected, so
   those songs play using the matching YouTube Music track (matched by title, artist and length,
   then remembered).
-- **Jam**: friends nearby share one queue over Nearby Connections (see below).
-- **Synthwave design**: Harmonic's own neon look (see the 1.2.0 notes in CHANGELOG.md).
+- **Jam**: friends nearby share one queue over Nearby Connections (see below). Guests join by
+  scanning the host's QR code, which the car's Jam button can show on the car screen.
+- **Five designs**: Synthwave, Cyber-Noir, Industrial / Neo-Gothic, Cyberpunk and
+  Matrixcore / Y2K, each with its own colours, title font and player backdrop; plain titles
+  optional.
 - **Sound interruptions**: choose Pause / Lower / Keep playing for calls, recording, other apps'
   sounds, navigation prompts and other music apps.
 - **Everyday comfort**: sleep timer (minutes or end of song, with fade-out), search history,
@@ -179,4 +182,7 @@ keyed by video id, so a song downloaded once plays offline wherever it appears.
 
 ## Licenses
 
-- Orbitron font: SIL Open Font License 1.1, see `licenses/Orbitron-OFL.txt`.
+- Fonts, all under the SIL Open Font License 1.1 (texts in `licenses/`): Orbitron (Synthwave),
+  Bebas Neue (Cyber-Noir), Cinzel (Industrial / Neo-Gothic), Chakra Petch (Cyberpunk) and
+  Share Tech Mono (Matrixcore / Y2K).
+- ZXing (QR codes): Apache License 2.0.
