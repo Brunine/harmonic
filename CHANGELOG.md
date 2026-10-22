@@ -11,7 +11,8 @@ Every release bumps both numbers in `app/build.gradle.kts`:
 
 | Version | versionCode | Date | Status |
 |---|---|---|---|
-| 1.7.0 | 8 | 2026-10-21 | In testing |
+| 1.7.1 | 9 | 2026-10-22 | In testing |
+| 1.7.0 | 8 | 2026-10-21 | Released |
 | 1.6.0 | 7 | 2026-10-21 | Released |
 | 1.5.0 | 6 | 2026-10-20 | Released |
 | 1.4.0 | 5 | 2026-10-20 | Released |
@@ -19,6 +20,20 @@ Every release bumps both numbers in `app/build.gradle.kts`:
 | 1.2.0 | 3 | 2026-10-20 | Released |
 | 1.1.0 | 2 | 2026-10-20 | Released |
 | 1.0.0 | 1 | 2026-10-19 | Released |
+
+## [1.7.1] - 2026-10-22
+
+### Fixed
+- **Player stuck on "play" and Android Auto "app unavailable"** (broken since 1.6.0): the layer
+  added in 1.6.0 to stop Android Auto's queue jumping to the top only passed on two kinds of
+  player events. The media session never heard that music was playing, so the app's player
+  kept its play button and a frozen progress bar, Android Auto said the app was unavailable
+  or showed placeholder content, and the notification and widget were out of date. Every
+  player event is passed on again; the queue fix and the car's Jam QR button keep working.
+
+### Added
+- Unit tests, run by the build before every APK: one fails the build if any player event is
+  not passed on, plus tests for song version matching and Jam codes.
 
 ## [1.7.0] - 2026-10-21
 

@@ -18,6 +18,7 @@ palette = "1.0.0"
 nearby = "19.2.0"
 zxing = "3.5.3"
 codeScanner = "16.1.0"
+junit = "4.13.2"
 reorderable = "2.5.1"
 # YouTube breaks extraction regularly: bumping this is the main maintenance task.
 # Releases: https://github.com/TeamNewPipe/NewPipeExtractor/releases
@@ -43,6 +44,7 @@ palette-ktx = { module = "androidx.palette:palette-ktx", version.ref = "palette"
 reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
 play-services-nearby = { module = "com.google.android.gms:play-services-nearby", version.ref = "nearby" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
+junit = { module = "junit:junit", version.ref = "junit" }
 play-services-code-scanner = { module = "com.google.android.gms:play-services-code-scanner", version.ref = "codeScanner" }
 room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
