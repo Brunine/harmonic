@@ -29,8 +29,8 @@ android {
         applicationId = "app.harmonic.music"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.7.0"
+        versionCode = 9
+        versionName = "1.7.1"
         // GitHub repository whose Releases "Check for updates" looks at (owner/name).
         buildConfigField("String", "UPDATE_REPO", "\"Brunine/harmonic\"")
         vectorDrawables.useSupportLibrary = true
@@ -141,6 +141,8 @@ dependencies {
     // Jam QR codes: drawing them (ZXing) and scanning them (Google's code scanner, no camera permission)
     implementation(libs.zxing.core)
     implementation(libs.play.services.code.scanner)
+
+    testImplementation(libs.junit)
 
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
